@@ -1,10 +1,13 @@
 /** @type {import('next').NextConfig} */
+const apiBase =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:4000';
+
 const nextConfig = {
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:5000/api/:path*', // Your Bun Express server
+        destination: `${apiBase}/api/:path*`,
       },
     ];
   },

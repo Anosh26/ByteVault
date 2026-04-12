@@ -1,0 +1,57 @@
+services:
+  branch_a_db:
+    image: postgres:16-alpine
+    container_name: bytevault_branch_a
+    depends_on:
+      branch_b_db:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin_a
+      POSTGRES_PASSWORD: secure_password_a
+      POSTGRES_DB: branch_a_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./docker/custom.conf:/etc/postgresql/custom.conf:ro
+      - branch_a_data:/var/lib/postgresql/data
+    command: ["postgres", "-c", "config_file=/etc/postgresql/custom.conf"]
+    networks:
+      - bytevault_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin_a -d branch_a_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  branch_b_db:
+    image: postgres:16-alpine
+    container_name: bytevault_branch_b
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin_b
+      POSTGRES_PASSWORD: secure_password_b
+      POSTGRES_DB: branch_b_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./docker/custom.conf:/etc/postgresql/custom.conf:ro
+      - branch_b_data:/var/lib/postgresql/data
+    command: ["postgres", "-c", "config_file=/etc/postgresql/custom.conf"]
+    networks:
+      - bytevault_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin_b -d branch_b_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  bytevault_net:
+    driver: bridge
+
+volumes:
+  branch_a_data:
+  branch_b_data:
