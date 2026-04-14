@@ -37,18 +37,63 @@ export async function ensureCustomerLedgerAccount(params: {
     `SELECT id FROM ledger_accounts WHERE type='CUSTOMER' AND ref_account_id=$1`,
     [accountId],
   );
-  if (existing.rows.length > 0) return { ledgerAccountId: existing.rows[0].id as string };
+  const ledgerAccountId: string | null =
+    existing.rows.length > 0 ? (existing.rows[0].id as string) : null;
 
   const acc = await client.query(`SELECT account_number FROM accounts WHERE id=$1`, [accountId]);
   if (acc.rows.length === 0) throw new Error('Account not found for ledger account creation');
 
-  const created = await client.query(
-    `INSERT INTO ledger_accounts (name, type, currency, ref_account_id)
-     VALUES ($1, 'CUSTOMER', $2, $3)
-     RETURNING id`,
-    [`Customer ${acc.rows[0].account_number}`, currency, accountId],
-  );
-  return { ledgerAccountId: created.rows[0].id as string };
+  const ensuredId =
+    ledgerAccountId ??
+    ((
+      await client.query(
+        `INSERT INTO ledger_accounts (name, type, currency, ref_account_id)
+         VALUES ($1, 'CUSTOMER', $2, $3)
+         RETURNING id`,
+        [`Customer ${acc.rows[0].account_number}`, currency, accountId],
+      )
+    ).rows[0].id as string);
+
+  // If this account existed with a cached balance before ledger was introduced,
+  // create an idempotent opening-balance entry so ledger and cache start aligned.
+  const cachedBal = await client.query(`SELECT balance FROM accounts WHERE id=$1`, [accountId]);
+  const cachedCents = Math.round(Number(cachedBal.rows[0]?.balance ?? 0) * 100);
+  if (cachedCents !== 0) {
+    const extRef = `OPENING:${accountId}`;
+    const already = await client.query(
+      `SELECT 1 FROM journal_entries WHERE external_ref=$1 AND kind='OPENING_BALANCE'`,
+      [extRef],
+    );
+    if (already.rows.length === 0) {
+      const currentBal = await getLedgerBalanceCents({ client, ledgerAccountId: ensuredId });
+      const deltaCents = cachedCents - currentBal.balanceCents;
+      if (deltaCents === 0) {
+        return { ledgerAccountId: ensuredId };
+      }
+      const equity = await ensureInternalLedgerAccount({
+        client,
+        code: 'EQUITY_OPENING_BALANCE',
+        name: 'Opening balance equity',
+        currency,
+      });
+      await postJournalEntry({
+        client,
+        input: {
+          kind: 'OPENING_BALANCE',
+          description: `Opening balance for account ${acc.rows[0].account_number}`,
+          externalRef: extRef,
+          lines: [
+            // Adjust customer to match cached balance at ledger-introduction time.
+            { ledgerAccountId: ensuredId, amountCents: deltaCents, memo: 'Opening balance adjustment' },
+            // Offset in equity to keep entry balanced.
+            { ledgerAccountId: equity.ledgerAccountId, amountCents: -deltaCents, memo: 'Offset' },
+          ],
+        },
+      });
+    }
+  }
+
+  return { ledgerAccountId: ensuredId };
 }
 
 export async function ensureInternalLedgerAccount(params: {
@@ -101,4 +146,18 @@ export async function postJournalEntry(params: { client: PoolClient; input: Post
 
   return { entry: entry.rows[0], entryId };
 }
+
+export async function getLedgerBalanceCents(params: {
+  client: PoolClient;
+  ledgerAccountId: string;
+}): Promise<{ balanceCents: number }> {
+  const q = await params.client.query(
+    `SELECT COALESCE(SUM(amount_cents), 0)::bigint AS balance_cents
+     FROM journal_lines
+     WHERE ledger_account_id = $1`,
+    [params.ledgerAccountId],
+  );
+  return { balanceCents: Number(q.rows[0].balance_cents) };
+}
+
 
