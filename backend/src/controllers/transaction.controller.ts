@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import crypto from 'crypto';
 import { poolA, poolB } from '../db.ts';
+import { ensureCustomerLedgerAccount, ensureInternalLedgerAccount, postJournalEntry } from '../ledger/ledger.ts';
 
 export async function execute2pcTransfer(params: {
   fromAccountId: string;
@@ -10,6 +11,7 @@ export async function execute2pcTransfer(params: {
   const { fromAccountId, toAccountId, amount } = params;
 
   const txId = `tx_${crypto.randomUUID().replace(/-/g, '')}`;
+  const amountCents = Math.round(amount * 100);
 
   const clientA = await poolA().connect();
   const clientB = await poolB().connect();
@@ -23,24 +25,61 @@ export async function execute2pcTransfer(params: {
     await clientA.query('BEGIN');
     await clientB.query('BEGIN');
 
-    const balanceRes = await clientA.query('SELECT balance FROM accounts WHERE id = $1 FOR UPDATE', [
-      fromAccountId,
-    ]);
+    // MAIN: lock source account row and validate cached balance (ledger will become source of truth later).
+    const balanceRes = await clientA.query('SELECT balance FROM accounts WHERE id = $1 FOR UPDATE', [fromAccountId]);
 
     if (balanceRes.rows.length === 0 || Number(balanceRes.rows[0].balance) < amount) {
       throw new Error('Insufficient funds or account not found');
     }
 
-    await clientA.query('UPDATE accounts SET balance = balance - $1 WHERE id = $2', [
-      amount,
-      fromAccountId,
-    ]);
+    // Update cached balances (kept for compatibility; later we can derive from ledger).
+    await clientA.query('UPDATE accounts SET balance = balance - $1 WHERE id = $2', [amount, fromAccountId]);
+    await clientB.query('UPDATE accounts SET balance = balance + $1 WHERE id = $2', [amount, toAccountId]);
 
-    await clientB.query('UPDATE accounts SET balance = balance + $1 WHERE id = $2', [
-      amount,
-      toAccountId,
-    ]);
+    // Ledger posting template (inter-branch clearing):
+    // - Main:  debit CUSTOMER(from)  / credit INTERNAL(CLEARING)
+    // - Sub:   debit INTERNAL(CLEARING) / credit CUSTOMER(to)
+    const mainCustomer = await ensureCustomerLedgerAccount({ client: clientA, accountId: fromAccountId });
+    const subCustomer = await ensureCustomerLedgerAccount({ client: clientB, accountId: toAccountId });
 
+    const mainClearing = await ensureInternalLedgerAccount({
+      client: clientA,
+      code: 'CLEARING_INTERBRANCH',
+      name: 'Inter-branch clearing',
+    });
+    const subClearing = await ensureInternalLedgerAccount({
+      client: clientB,
+      code: 'CLEARING_INTERBRANCH',
+      name: 'Inter-branch clearing',
+    });
+
+    await postJournalEntry({
+      client: clientA,
+      input: {
+        kind: 'TRANSFER_OUT',
+        description: `Inter-branch transfer out (${txId})`,
+        externalRef: txId,
+        lines: [
+          { ledgerAccountId: mainCustomer.ledgerAccountId, amountCents: -amountCents, memo: 'Debit customer' },
+          { ledgerAccountId: mainClearing.ledgerAccountId, amountCents: amountCents, memo: 'Credit clearing' },
+        ],
+      },
+    });
+
+    await postJournalEntry({
+      client: clientB,
+      input: {
+        kind: 'TRANSFER_IN',
+        description: `Inter-branch transfer in (${txId})`,
+        externalRef: txId,
+        lines: [
+          { ledgerAccountId: subClearing.ledgerAccountId, amountCents: -amountCents, memo: 'Debit clearing' },
+          { ledgerAccountId: subCustomer.ledgerAccountId, amountCents: amountCents, memo: 'Credit customer' },
+        ],
+      },
+    });
+
+    // Keep legacy transaction rows for now (compatibility / UI). Ledger is the real source of truth going forward.
     await clientA.query(
       "INSERT INTO transactions (id, account_id, type, amount, status) VALUES ($1, $2, 'DEBIT', $3, 'PENDING')",
       [txId, fromAccountId, amount],

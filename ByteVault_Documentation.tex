@@ -1,0 +1,280 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{longtable}
+\usepackage{booktabs}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+\lstdefinestyle{bash}{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  backgroundcolor=\color{gray!5}
+}
+\lstdefinestyle{json}{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  backgroundcolor=\color{gray!5}
+}
+\lstdefinestyle{sql}{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  backgroundcolor=\color{gray!5}
+}
+
+\title{\textbf{ByteVault Project Documentation}}
+\author{ByteVault Team}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Overview}
+ByteVault is a banking management application with:
+\begin{itemize}[nosep]
+  \item A \textbf{Next.js} client (frontend).
+  \item A \textbf{Bun + Express} API server (backend).
+  \item \textbf{Two PostgreSQL 16} databases (Main branch and Sub branch) running in Docker.
+  \item Cross-database integration using \textbf{Foreign Data Wrapper (FDW)} and cross-branch settlement correctness using \textbf{Two-Phase Commit (2PC)}.
+\end{itemize}
+
+\section{Goals and Constraints}
+\subsection{Banking correctness goals}
+\begin{itemize}[nosep]
+  \item \textbf{ACID}: transactional correctness for all money movements.
+  \item \textbf{Idempotency}: all payment/transfer routes accept idempotency keys to prevent duplicate execution.
+  \item \textbf{Auditability}: sensitive operations are written to an audit log.
+  \item \textbf{Maker/Checker}: transfer requests are created by Maker and executed only after Checker approval.
+\end{itemize}
+
+\subsection{Architecture constraints}
+\begin{itemize}[nosep]
+  \item Main branch DB is \textbf{local} and imports Sub branch tables via FDW (\texttt{fdw\_sub.*}).
+  \item Schemas are mirrored between Main and Sub.
+  \item Backend communicates to each DB using separate connection strings.
+\end{itemize}
+
+\section{Repository Layout}
+\begin{longtable}{@{}ll@{}}
+\toprule
+Path & Purpose \\
+\midrule
+\texttt{docker-compose.yml} & Starts Main and Sub Postgres containers \\
+\texttt{docker/init.sql} & Schema bootstrap (mirrored tables + FDW setup on Main) \\
+\texttt{docker/custom.conf} & Postgres runtime config (timeouts, listen\_addresses, 2PC) \\
+\texttt{docker/apply-*.sql} & Apply migrations to existing DB volumes \\
+\texttt{backend/} & Bun + Express API server \\
+\texttt{client/} & Next.js frontend \\
+\bottomrule
+\end{longtable}
+
+\section{Databases}
+\subsection{Containers}
+Two Postgres containers are used:
+\begin{itemize}[nosep]
+  \item \textbf{Main DB}: \texttt{branch\_a\_db} (container \texttt{bytevault\_branch\_a})
+  \item \textbf{Sub DB}: \texttt{branch\_b\_db} (container \texttt{bytevault\_branch\_b})
+\end{itemize}
+
+\subsection{FDW}
+Main imports a subset of Sub tables into schema \texttt{fdw\_sub}:
+\begin{itemize}[nosep]
+  \item \texttt{branches}, \texttt{users}, \texttt{employees}, \texttt{accounts}, \texttt{transactions}, \texttt{external\_transfers}
+\end{itemize}
+
+This enables Main to resolve Sub entities without direct Sub DB access from the client.
+
+\subsection{2PC}
+Cross-branch settlement uses Postgres prepared transactions:
+\begin{itemize}[nosep]
+  \item \texttt{PREPARE TRANSACTION}
+  \item \texttt{COMMIT PREPARED} / \texttt{ROLLBACK PREPARED}
+\end{itemize}
+
+\textbf{Important:} Postgres must have \texttt{max\_prepared\_transactions > 0}. This is configured in \texttt{docker/custom.conf}.
+
+\subsection{Core schema (high-level)}
+The schema includes:
+\begin{itemize}[nosep]
+  \item Operational tables: \texttt{branches}, \texttt{users}, \texttt{employees}, \texttt{accounts}
+  \item Transfer workflow: \texttt{transfer\_requests} (maker/checker)
+  \item Idempotency: \texttt{idempotency\_keys}
+  \item Auditing: \texttt{audit\_logs}
+  \item Ledger (double-entry): \texttt{ledger\_accounts}, \texttt{journal\_entries}, \texttt{journal\_lines}
+\end{itemize}
+
+\section{Backend (Bun + Express)}
+\subsection{Runtime configuration}
+Backend reads environment variables from \texttt{backend/.env}. Example:
+\begin{lstlisting}[style=bash]
+PORT=4000
+BRANCH_A_DB_URL=postgresql://admin_a:secure_password_a@localhost:55432/branch_a_db
+BRANCH_B_DB_URL=postgresql://admin_b:secure_password_b@localhost:55433/branch_b_db
+JWT_SECRET=change_me_to_a_long_random_string
+JWT_ISSUER=bytevault
+JWT_AUDIENCE=bytevault-client
+\end{lstlisting}
+
+\subsection{Logging and debugging}
+Every request logs:
+\begin{itemize}[nosep]
+  \item request start/end
+  \item correlation id \texttt{x-request-id}
+  \item method, path, status, latency (ms)
+  \item employee id/role (when authenticated)
+\end{itemize}
+
+\subsection{Health endpoints}
+\begin{itemize}[nosep]
+  \item \texttt{GET /health}: basic liveness
+  \item \texttt{GET /health/deep}: DB A, DB B, FDW presence, 2PC readiness
+\end{itemize}
+
+\subsection{Authentication and RBAC}
+\begin{itemize}[nosep]
+  \item Employee login issues JWT access tokens.
+  \item RBAC roles: \texttt{MAKER}, \texttt{CHECKER}, \texttt{MANAGER}, \texttt{ADMIN}
+  \item Authorization is enforced server-side using middleware.
+\end{itemize}
+
+\subsection{Idempotency}
+Payment/transfer routes require an \texttt{Idempotency-Key} header. The backend:
+\begin{itemize}[nosep]
+  \item stores request hash and response snapshot
+  \item returns prior response on repeated requests (same key, same body)
+  \item marks failures as \texttt{FAILED} to avoid stuck \texttt{IN\_PROGRESS}
+\end{itemize}
+
+\subsection{Current API surface (summary)}
+\paragraph{Auth}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/auth/employee/login}
+  \item \texttt{GET /api/auth/me}
+\end{itemize}
+
+\paragraph{Users}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/users}
+  \item \texttt{GET /api/users?limit=\dots\&offset=\dots}
+  \item \texttt{GET /api/users/:id}
+\end{itemize}
+
+\paragraph{Accounts}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/accounts}
+  \item \texttt{GET /api/accounts?limit=\dots\&offset=\dots}
+  \item \texttt{GET /api/accounts/:id}
+  \item \texttt{GET /api/accounts/by-number/:accountNumber}
+\end{itemize}
+
+\paragraph{Transfers (Maker/Checker)}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/transfers/requests} (Maker)
+  \item \texttt{POST /api/transfers/requests/:id/approve} (Checker; executes 2PC)
+  \item \texttt{POST /api/transfers/requests/:id/reject} (Checker)
+  \item \texttt{GET /api/transfers/requests}
+\end{itemize}
+
+\paragraph{Ledger (Admin only for now)}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/ledger/entries}
+  \item \texttt{GET /api/ledger/entries/:id}
+\end{itemize}
+
+\section{Ledger (Double-Entry Accounting)}
+\subsection{Concept}
+Money movement is represented as a \textbf{journal entry} with multiple \textbf{journal lines}:
+\[
+\sum_{i=1}^{n} \text{amount\_cents}_i = 0
+\]
+
+Lines are signed integers in cents:
+\begin{itemize}[nosep]
+  \item Positive = credit
+  \item Negative = debit
+\end{itemize}
+
+\subsection{Ledger accounts}
+\begin{itemize}[nosep]
+  \item \texttt{CUSTOMER}: one ledger account per customer bank account (\texttt{ref\_account\_id})
+  \item \texttt{INTERNAL}: internal buckets (fees, suspense, clearing)
+\end{itemize}
+
+\subsection{Posting}
+Posting is performed in a SQL transaction:
+\begin{itemize}[nosep]
+  \item validate balanced lines
+  \item insert \texttt{journal\_entries}
+  \item insert \texttt{journal\_lines}
+\end{itemize}
+
+\section{How to Run (Development)}
+\subsection{Databases}
+From repo root:
+\begin{lstlisting}[style=bash]
+docker compose up -d
+docker compose ps
+\end{lstlisting}
+
+\subsection{Backend}
+\begin{lstlisting}[style=bash]
+cd backend
+bun install
+cp .env.example .env
+bun run dev
+\end{lstlisting}
+
+\subsection{Client}
+\begin{lstlisting}[style=bash]
+cd client
+npm install
+cp .env.example .env.local
+npm run dev
+\end{lstlisting}
+
+\section{Operational Notes}
+\subsection{Applying migrations to existing volumes}
+If DB volumes already exist, apply incremental scripts:
+\begin{lstlisting}[style=bash]
+docker compose exec -T branch_a_db psql -U admin_a -d branch_a_db < docker/apply-security.sql
+docker compose exec -T branch_b_db psql -U admin_b -d branch_b_db < docker/apply-security.sql
+
+docker compose exec -T branch_a_db psql -U admin_a -d branch_a_db < docker/apply-ledger.sql
+docker compose exec -T branch_b_db psql -U admin_b -d branch_b_db < docker/apply-ledger.sql
+\end{lstlisting}
+
+\subsection{Deep health check}
+\begin{lstlisting}[style=bash]
+curl http://localhost:4000/health/deep
+\end{lstlisting}
+
+\section{Next Implementation Milestones}
+\begin{enumerate}[nosep]
+  \item Replace balance mutation with ledger posting for transfers (while keeping 2PC).
+  \item Add internal ledger accounts (clearing/suspense/fees) and formalize transfer entry templates.
+  \item Add reversals (immutable corrections) and reconciliation tooling.
+  \item Add integration tests for ledger invariants, idempotency, and 2PC failure modes.
+\end{enumerate}
+
+\end{document}
+

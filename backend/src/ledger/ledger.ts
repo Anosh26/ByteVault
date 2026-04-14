@@ -51,6 +51,29 @@ export async function ensureCustomerLedgerAccount(params: {
   return { ledgerAccountId: created.rows[0].id as string };
 }
 
+export async function ensureInternalLedgerAccount(params: {
+  client: PoolClient;
+  code: string;
+  name: string;
+  currency?: string;
+}): Promise<{ ledgerAccountId: string }> {
+  const { client, code, name } = params;
+  const currency = params.currency ?? 'INR';
+
+  const existing = await client.query(`SELECT id FROM ledger_accounts WHERE type='INTERNAL' AND code=$1`, [
+    code,
+  ]);
+  if (existing.rows.length > 0) return { ledgerAccountId: existing.rows[0].id as string };
+
+  const created = await client.query(
+    `INSERT INTO ledger_accounts (code, name, type, currency)
+     VALUES ($1, $2, 'INTERNAL', $3)
+     RETURNING id`,
+    [code, name, currency],
+  );
+  return { ledgerAccountId: created.rows[0].id as string };
+}
+
 export async function postJournalEntry(params: { client: PoolClient; input: PostEntryInput }) {
   const { client, input } = params;
 
