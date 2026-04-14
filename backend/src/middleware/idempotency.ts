@@ -23,6 +23,21 @@ export function requireIdempotencyKey(opts?: { routeTag?: string }) {
       .update(stableJson(req.body ?? {}))
       .digest('hex');
 
+    const finalize = async (status: 'COMPLETED' | 'FAILED', code: number, body: unknown) => {
+      await poolA().query(
+        `UPDATE idempotency_keys
+         SET status = $1,
+             response_code = $2,
+             response_body = $3,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE actor_type = 'EMPLOYEE'
+           AND actor_id = $4
+           AND key = $5
+           AND route = $6`,
+        [status, code, body, actor.id, key, routeTag],
+      );
+    };
+
     const existing = await poolA().query(
       `SELECT status, request_hash, response_code, response_body
        FROM idempotency_keys
@@ -61,24 +76,18 @@ export function requireIdempotencyKey(opts?: { routeTag?: string }) {
     const originalJson = res.json.bind(res);
     res.json = ((body: any) => {
       const statusCode = res.statusCode || 200;
-      poolA()
-        .query(
-          `UPDATE idempotency_keys
-           SET status = 'COMPLETED',
-               response_code = $1,
-               response_body = $2,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE actor_type = 'EMPLOYEE'
-             AND actor_id = $3
-             AND key = $4
-             AND route = $5`,
-          [statusCode, body, actor.id, key, routeTag],
-        )
-        .catch(console.error);
+      const status: 'COMPLETED' | 'FAILED' = statusCode >= 400 ? 'FAILED' : 'COMPLETED';
+      finalize(status, statusCode, body).catch(console.error);
       return originalJson(body);
     }) as any;
 
-    return next();
+    try {
+      return next();
+    } catch (e) {
+      // In case a handler throws synchronously, mark FAILED so the key doesn't stick IN_PROGRESS.
+      finalize('FAILED', 500, { error: 'Unhandled exception', details: String(e) }).catch(console.error);
+      throw e;
+    }
   };
 }
 

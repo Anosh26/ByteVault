@@ -3,6 +3,7 @@ import express from 'express';
 import { poolA } from '../db.ts';
 import { verifyPassword } from '../utils/password.ts';
 import { signEmployeeToken } from '../auth/jwt.ts';
+import { requireEmployeeAuth } from '../middleware/auth.ts';
 
 export const authRouter = express.Router();
 
@@ -42,5 +43,10 @@ authRouter.post('/employee/login', async (req: Request, res: Response) => {
     tokenType: 'Bearer',
     employee: { id: row.id, email: row.email, role: row.role, branchId: row.branch_id },
   });
+});
+
+authRouter.get('/me', requireEmployeeAuth, async (req: Request, res: Response) => {
+  const emp = req.employee!;
+  return res.json({ employee: emp });
 });
 

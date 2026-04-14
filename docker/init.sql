@@ -102,6 +102,60 @@ CREATE INDEX idx_idempotency_polling
 ON idempotency_keys (status, created_at)
 WHERE status = 'IN_PROGRESS';
 
+-- Audit log for sensitive operations (transfers, approvals, admin actions).
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_type VARCHAR(20) NOT NULL CHECK (actor_type IN ('USER', 'EMPLOYEE')),
+    actor_id UUID NOT NULL,
+    action VARCHAR(80) NOT NULL,
+    entity_type VARCHAR(80) NOT NULL,
+    entity_id UUID,
+    meta JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);
+CREATE INDEX idx_audit_logs_entity ON audit_logs (entity_type, entity_id);
+
+-- ---------------------------------------------------------------------------
+-- Ledger foundation (double-entry)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE ledger_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(50) UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    type VARCHAR(30) NOT NULL CHECK (type IN ('CUSTOMER', 'INTERNAL')),
+    currency CHAR(3) NOT NULL DEFAULT 'INR',
+    -- For CUSTOMER type, this links back to the banking account.
+    ref_account_id UUID UNIQUE REFERENCES accounts(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- One business event (transfer, deposit, reversal, fee).
+CREATE TABLE journal_entries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    -- e.g. TRANSFER, REVERSAL, FEE, DEPOSIT
+    kind VARCHAR(40) NOT NULL,
+    description TEXT,
+    external_ref VARCHAR(120),
+    created_by_employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_journal_entries_created_at ON journal_entries (created_at DESC);
+CREATE INDEX idx_journal_entries_external_ref ON journal_entries (external_ref);
+
+-- Lines are signed cents; sum(amount_cents) must be 0 (enforced in app for now).
+CREATE TABLE journal_lines (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entry_id UUID NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+    ledger_account_id UUID NOT NULL REFERENCES ledger_accounts(id) ON DELETE RESTRICT,
+    amount_cents BIGINT NOT NULL CHECK (amount_cents <> 0),
+    memo TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_journal_lines_entry_id ON journal_lines (entry_id);
+CREATE INDEX idx_journal_lines_ledger_account_id ON journal_lines (ledger_account_id);
+
 -- Maker/Checker transfer approvals.
 CREATE TABLE transfer_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

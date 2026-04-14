@@ -66,6 +66,43 @@ BEGIN
   END IF;
 END $$;
 
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_type VARCHAR(20) NOT NULL CHECK (actor_type IN ('USER', 'EMPLOYEE')),
+    actor_id UUID NOT NULL,
+    action VARCHAR(80) NOT NULL,
+    entity_type VARCHAR(80) NOT NULL,
+    entity_id UUID,
+    meta JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname = 'idx_audit_logs_created_at'
+  ) THEN
+    EXECUTE 'CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC)';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname = 'idx_audit_logs_entity'
+  ) THEN
+    EXECUTE 'CREATE INDEX idx_audit_logs_entity ON audit_logs (entity_type, entity_id)';
+  END IF;
+END $$;
+
 -- If this DB was created with older constraints/columns, migrate in-place.
 ALTER TABLE transfer_requests
   DROP CONSTRAINT IF EXISTS transfer_requests_to_account_id_fkey;

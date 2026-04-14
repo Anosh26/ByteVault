@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import express from 'express';
-import { poolA, poolB } from '../db.ts';
+import { poolA } from '../db.ts';
 import { requireEmployeeAuth, requireEmployeeRole } from '../middleware/auth.ts';
 import { requireIdempotencyKey } from '../middleware/idempotency.ts';
 import { execute2pcTransfer } from '../controllers/transaction.controller.ts';
@@ -21,6 +21,21 @@ async function resolveAccountByNumber(accountNumber: string): Promise<ResolveRes
 }
 
 export const transfersRouter = express.Router();
+
+async function audit(params: {
+  actorEmployeeId: string;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  meta?: unknown;
+}) {
+  const { actorEmployeeId, action, entityType, entityId, meta } = params;
+  await poolA().query(
+    `INSERT INTO audit_logs (actor_type, actor_id, action, entity_type, entity_id, meta)
+     VALUES ('EMPLOYEE', $1, $2, $3, $4, $5)`,
+    [actorEmployeeId, action, entityType, entityId ?? null, meta ?? null],
+  );
+}
 
 // Maker creates a transfer request using account numbers (UI-friendly).
 transfersRouter.post(
@@ -62,6 +77,14 @@ transfersRouter.post(
       [emp.id, from.accountId, toAccountNumber, to.accountId, amount],
     );
 
+    await audit({
+      actorEmployeeId: emp.id,
+      action: 'TRANSFER_REQUEST_CREATED',
+      entityType: 'transfer_request',
+      entityId: insert.rows[0].id,
+      meta: { fromAccountNumber, toAccountNumber, amount },
+    });
+
     return res.status(201).json({ request: insert.rows[0] });
   },
 );
@@ -74,7 +97,7 @@ transfersRouter.post(
   requireIdempotencyKey({ routeTag: 'POST /api/transfers/requests/:id/approve' }),
   async (req: Request, res: Response) => {
     const emp = req.employee!;
-    const id = req.params.id;
+    const id = String(req.params.id);
 
     const client = await poolA().connect();
     try {
@@ -136,8 +159,17 @@ transfersRouter.post(
         [exec.transactionId, row.id],
       );
 
+      await audit({
+        actorEmployeeId: emp.id,
+        action: 'TRANSFER_REQUEST_APPROVED_EXECUTED',
+        entityType: 'transfer_request',
+        entityId: row.id,
+        meta: { executionTxId: exec.transactionId },
+      });
+
       return res.json({ ok: true, transactionId: exec.transactionId });
     } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
       try {
         await poolA().query(
           `UPDATE transfer_requests
@@ -148,12 +180,14 @@ transfersRouter.post(
       } catch {}
 
       try {
-        await (async () => {
-          /* noop */
-        })();
-      } finally {
-        // fallthrough
-      }
+        await audit({
+          actorEmployeeId: emp.id,
+          action: 'TRANSFER_REQUEST_APPROVE_FAILED',
+          entityType: 'transfer_request',
+          entityId: id,
+          meta: { error: e instanceof Error ? e.message : 'Unknown error' },
+        });
+      } catch {}
 
       return res.status(500).json({ error: 'Approval/execute failed', details: e instanceof Error ? e.message : 'Unknown error' });
     } finally {
@@ -185,6 +219,15 @@ transfersRouter.post(
     );
 
     if (q.rows.length === 0) return res.status(404).json({ error: 'Transfer request not found or not pending' });
+
+    await audit({
+      actorEmployeeId: emp.id,
+      action: 'TRANSFER_REQUEST_REJECTED',
+      entityType: 'transfer_request',
+      entityId: q.rows[0].id,
+      meta: { reason: reason ?? null },
+    });
+
     return res.json({ request: q.rows[0] });
   },
 );
