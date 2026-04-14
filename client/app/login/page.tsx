@@ -21,6 +21,8 @@ export default function LoginPage() {
       const { accessToken } = res.data ?? {};
       if (!accessToken) throw new Error('No access token returned');
       window.localStorage.setItem('bytevault_access_token', accessToken);
+      // Let proxy.ts protect routes (server-readable cookie; not a security boundary).
+      document.cookie = `bv_logged_in=true; path=/; max-age=${60 * 60 * 2}`;
       router.push('/dashboard');
     } catch (err: any) {
       const msg =
