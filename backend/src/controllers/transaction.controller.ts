@@ -1,9 +1,6 @@
 import type { Request, Response } from 'express';
-import { Pool } from 'pg';
 import crypto from 'crypto';
-
-const poolA = new Pool({ connectionString: process.env.BRANCH_A_DB_URL });
-const poolB = new Pool({ connectionString: process.env.BRANCH_B_DB_URL });
+import { poolA, poolB } from '../db.ts';
 
 export const transferFunds = async (req: Request, res: Response) => {
   const { fromAccount, toAccount, amount } = req.body;
@@ -14,8 +11,8 @@ export const transferFunds = async (req: Request, res: Response) => {
 
   const txId = `tx_${crypto.randomUUID().replace(/-/g, '')}`;
 
-  const clientA = await poolA.connect();
-  const clientB = await poolB.connect();
+  const clientA = await poolA().connect();
+  const clientB = await poolB().connect();
 
   try {
     await clientA.query('SET statement_timeout = 5000');

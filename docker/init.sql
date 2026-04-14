@@ -71,6 +71,61 @@ CREATE INDEX idx_outbox_polling
 ON external_transfers (direction, network_status)
 WHERE network_status IN ('QUEUED', 'PROCESSING');
 
+-- ---------------------------------------------------------------------------
+-- Security + approvals foundation
+-- ---------------------------------------------------------------------------
+
+-- Employee login credentials (employees table is identity + role; this stores secrets separately).
+CREATE TABLE employee_credentials (
+    employee_id UUID PRIMARY KEY REFERENCES employees(id) ON DELETE CASCADE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Idempotency keys for all payment routes.
+-- Stores a stable response for a given (actor, key, route).
+CREATE TABLE idempotency_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_type VARCHAR(20) NOT NULL CHECK (actor_type IN ('USER', 'EMPLOYEE')),
+    actor_id UUID NOT NULL,
+    key VARCHAR(128) NOT NULL,
+    route VARCHAR(200) NOT NULL,
+    request_hash VARCHAR(128) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'IN_PROGRESS' CHECK (status IN ('IN_PROGRESS', 'COMPLETED', 'FAILED')),
+    response_code INT,
+    response_body JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (actor_type, actor_id, key, route)
+);
+CREATE INDEX idx_idempotency_polling
+ON idempotency_keys (status, created_at)
+WHERE status = 'IN_PROGRESS';
+
+-- Maker/Checker transfer approvals.
+CREATE TABLE transfer_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_by_employee_id UUID REFERENCES employees(id) ON DELETE RESTRICT,
+    approved_by_employee_id UUID REFERENCES employees(id) ON DELETE RESTRICT,
+
+    source_branch_id UUID REFERENCES branches(id) ON DELETE RESTRICT,
+    target_branch_id UUID REFERENCES branches(id) ON DELETE RESTRICT,
+    from_account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT,
+    to_account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT,
+
+    amount DECIMAL(15, 2) NOT NULL CHECK (amount > 0),
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED')),
+    rejection_reason TEXT,
+
+    -- For tracing distributed operations (2PC + audit)
+    execution_tx_id VARCHAR(255),
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_transfer_requests_status_created_at
+ON transfer_requests (status, created_at);
+
 CREATE OR REPLACE FUNCTION check_balance(acc_id UUID)
 RETURNS TABLE (balance DECIMAL(15, 2)) AS $$
 BEGIN

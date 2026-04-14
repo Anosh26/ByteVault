@@ -2,6 +2,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import { transferFunds } from './src/controllers/transaction.controller.ts';
+import { authRouter } from './src/routes/auth.ts';
+import { requireEmployeeAuth } from './src/middleware/auth.ts';
+import { requireIdempotencyKey } from './src/middleware/idempotency.ts';
 
 dotenv.config();
 
@@ -13,7 +16,15 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/transfers', transferFunds);
+app.use('/api/auth', authRouter);
+
+// Temporary: direct 2PC transfer is protected (will become checker-approved flow next).
+app.post(
+  '/api/transfers',
+  requireEmployeeAuth,
+  requireIdempotencyKey({ routeTag: 'POST /api/transfers' }),
+  transferFunds,
+);
 
 const port = Number(process.env.PORT) || 4000;
 app.listen(port, () => {

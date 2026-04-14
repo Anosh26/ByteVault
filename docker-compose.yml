@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: secure_password_a
       POSTGRES_DB: branch_a_db
     ports:
-      - "5432:5432"
+      - "55432:5432"
     volumes:
       - ./docker/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
       - ./docker/custom.conf:/etc/postgresql/custom.conf:ro
@@ -34,7 +34,7 @@ services:
       POSTGRES_PASSWORD: secure_password_b
       POSTGRES_DB: branch_b_db
     ports:
-      - "5433:5432"
+      - "55433:5432"
     volumes:
       - ./docker/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
       - ./docker/custom.conf:/etc/postgresql/custom.conf:ro
