@@ -1,5 +1,38 @@
 // app/login/page.tsx
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import api from '@/lib/axios';
+
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await api.post('/api/auth/employee/login', { email, password });
+      const { accessToken } = res.data ?? {};
+      if (!accessToken) throw new Error('No access token returned');
+      window.localStorage.setItem('bytevault_access_token', accessToken);
+      router.push('/dashboard');
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error ||
+        err?.message ||
+        'Login failed';
+      setError(String(msg));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-md space-y-8 rounded-2xl border border-slate-800 bg-slate-900/50 p-8 shadow-2xl backdrop-blur-sm">
@@ -9,7 +42,7 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-slate-400">Please enter your credentials to access your vault.</p>
         </div>
 
-        <form className="mt-8 space-y-6">
+        <form className="mt-8 space-y-6" onSubmit={onSubmit}>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-300">Email Address</label>
@@ -17,6 +50,10 @@ export default function LoginPage() {
                 type="email" 
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="name@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
+                required
               />
             </div>
             <div>
@@ -25,15 +62,26 @@ export default function LoginPage() {
                 type="password" 
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
               />
             </div>
           </div>
 
+          {error ? (
+            <div className="rounded-lg border border-red-900/50 bg-red-950/40 p-3 text-sm text-red-200">
+              {error}
+            </div>
+          ) : null}
+
           <button 
             type="submit"
-            className="w-full rounded-lg bg-blue-600 p-3 font-semibold text-white transition-all hover:bg-blue-700 active:scale-[0.98]"
+            disabled={loading}
+            className="w-full rounded-lg bg-blue-600 p-3 font-semibold text-white transition-all hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
           >
-            Sign In to Vault
+            {loading ? 'Signing in…' : 'Sign In to Vault'}
           </button>
         </form>
 
