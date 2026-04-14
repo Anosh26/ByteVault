@@ -199,6 +199,8 @@ Payment/transfer routes require an \texttt{Idempotency-Key} header. The backend:
 \begin{itemize}[nosep]
   \item \texttt{POST /api/ledger/entries}
   \item \texttt{GET /api/ledger/entries/:id}
+  \item \texttt{GET /api/ledger/customer-accounts/:bankAccountId/balance}
+  \item \texttt{POST /api/ledger/customer-accounts/:bankAccountId/sync-to-cached} (Admin)
 \end{itemize}
 
 \section{Ledger (Double-Entry Accounting)}
@@ -227,6 +229,21 @@ Posting is performed in a SQL transaction:
   \item insert \texttt{journal\_entries}
   \item insert \texttt{journal\_lines}
 \end{itemize}
+
+\subsection{Cached balance compatibility}
+During the transition to a ledger-first system, \texttt{accounts.balance} is treated as a \textbf{cached} value for compatibility. The system supports:
+\begin{itemize}[nosep]
+  \item Auto-creation of an \texttt{OPENING\_BALANCE} entry (idempotent, per account) so ledger and cache start aligned.
+  \item A privileged sync endpoint (\texttt{sync-to-cached}) which posts a balanced adjustment entry if drift is detected.
+\end{itemize}
+
+\subsection{Inter-branch transfer template (Phase 1)}
+For inter-branch settlement with 2PC, transfers currently post balanced entries in both DBs using an internal clearing account:
+\begin{itemize}[nosep]
+  \item \textbf{Main DB} (\texttt{TRANSFER\_OUT}): debit customer / credit clearing
+  \item \textbf{Sub DB} (\texttt{TRANSFER\_IN}): debit clearing / credit customer
+\end{itemize}
+This keeps each database internally consistent while 2PC ensures both sides commit together.
 
 \section{How to Run (Development)}
 \subsection{Databases}
@@ -270,7 +287,9 @@ curl http://localhost:4000/health/deep
 
 \section{Next Implementation Milestones}
 \begin{enumerate}[nosep]
-  \item Replace balance mutation with ledger posting for transfers (while keeping 2PC).
+  \item Phase 1: Post ledger entries for transfers under 2PC (keep cached balance for compatibility). \textbf{Done}.
+  \item Phase 1: Add ledger-derived balance endpoints and drift detection/sync. \textbf{Done}.
+  \item Phase 1: Move insufficient-funds checks to ledger-derived available balance (introduce holds/authorizations).
   \item Add internal ledger accounts (clearing/suspense/fees) and formalize transfer entry templates.
   \item Add reversals (immutable corrections) and reconciliation tooling.
   \item Add integration tests for ledger invariants, idempotency, and 2PC failure modes.
