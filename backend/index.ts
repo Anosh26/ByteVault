@@ -5,6 +5,8 @@ import { transferFunds } from './src/controllers/transaction.controller.ts';
 import { authRouter } from './src/routes/auth.ts';
 import { requireEmployeeAuth } from './src/middleware/auth.ts';
 import { requireIdempotencyKey } from './src/middleware/idempotency.ts';
+import { transfersRouter } from './src/routes/transfers.ts';
+import { devRouter } from './src/routes/dev.ts';
 
 dotenv.config();
 
@@ -17,6 +19,8 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/transfers', transfersRouter);
+app.use('/api/dev', devRouter);
 
 // Temporary: direct 2PC transfer is protected (will become checker-approved flow next).
 app.post(

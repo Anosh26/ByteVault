@@ -108,10 +108,11 @@ CREATE TABLE transfer_requests (
     created_by_employee_id UUID REFERENCES employees(id) ON DELETE RESTRICT,
     approved_by_employee_id UUID REFERENCES employees(id) ON DELETE RESTRICT,
 
-    source_branch_id UUID REFERENCES branches(id) ON DELETE RESTRICT,
-    target_branch_id UUID REFERENCES branches(id) ON DELETE RESTRICT,
+    -- Cross-branch: only the source account is guaranteed local on Main.
     from_account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT,
-    to_account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT,
+    to_account_number VARCHAR(20) NOT NULL,
+    -- Optional resolved UUID in the foreign branch (cannot be a FK here).
+    to_account_id UUID,
 
     amount DECIMAL(15, 2) NOT NULL CHECK (amount > 0),
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED')),

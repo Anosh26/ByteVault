@@ -39,11 +39,9 @@ CREATE TABLE IF NOT EXISTS transfer_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_by_employee_id UUID REFERENCES employees(id) ON DELETE RESTRICT,
     approved_by_employee_id UUID REFERENCES employees(id) ON DELETE RESTRICT,
-
-    source_branch_id UUID REFERENCES branches(id) ON DELETE RESTRICT,
-    target_branch_id UUID REFERENCES branches(id) ON DELETE RESTRICT,
     from_account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT,
-    to_account_id UUID REFERENCES accounts(id) ON DELETE RESTRICT,
+    to_account_number VARCHAR(20) NOT NULL,
+    to_account_id UUID,
 
     amount DECIMAL(15, 2) NOT NULL CHECK (amount > 0),
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED')),
@@ -67,4 +65,18 @@ BEGIN
     EXECUTE 'CREATE INDEX idx_transfer_requests_status_created_at ON transfer_requests (status, created_at)';
   END IF;
 END $$;
+
+-- If this DB was created with older constraints/columns, migrate in-place.
+ALTER TABLE transfer_requests
+  DROP CONSTRAINT IF EXISTS transfer_requests_to_account_id_fkey;
+ALTER TABLE transfer_requests
+  DROP CONSTRAINT IF EXISTS transfer_requests_source_branch_id_fkey;
+ALTER TABLE transfer_requests
+  DROP CONSTRAINT IF EXISTS transfer_requests_target_branch_id_fkey;
+
+ALTER TABLE transfer_requests
+  ADD COLUMN IF NOT EXISTS to_account_number VARCHAR(20);
+ALTER TABLE transfer_requests
+  ADD COLUMN IF NOT EXISTS to_account_id UUID;
+
 
