@@ -1,17 +1,19 @@
-export default function BalanceCard({ amount }: { amount: string }) {
+import { formatInr } from '@/lib/format';
+
+export default function BalanceCard({
+  amountInr,
+  loading,
+}: {
+  amountInr: number;
+  loading?: boolean;
+}) {
+  const display = loading ? '…' : formatInr(amountInr);
+
   return (
-    <div className="bg-linear-to-br from-blue-600 to-blue-800 p-8 rounded-2xl shadow-xl">
-      <p className="text-blue-100 text-sm font-medium uppercase tracking-wider">Total Balance</p>
-      <h2 className="text-4xl font-bold mt-2">$ {amount}</h2>
-      <div className="flex gap-4 mt-6">
-        <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm transition">
-          Transfer
-        </button>
-        <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm transition">
-          Deposit
-        </button>
-      </div>
+    <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-900 p-8 shadow-xl">
+      <p className="text-sm font-medium uppercase tracking-wider text-blue-100/90">Total on MAIN (all listed accounts)</p>
+      <h2 className="mt-2 text-4xl font-bold tabular-nums">{display}</h2>
+      <p className="mt-2 text-sm text-blue-100/70">Balances are shown in INR to match the ledger.</p>
     </div>
   );
 }
-
