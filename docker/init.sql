@@ -156,6 +156,21 @@ CREATE TABLE journal_lines (
 CREATE INDEX idx_journal_lines_entry_id ON journal_lines (entry_id);
 CREATE INDEX idx_journal_lines_ledger_account_id ON journal_lines (ledger_account_id);
 
+-- Holds/authorizations: reserved funds that reduce available balance but do not change ledger balance.
+-- Use for card authorizations, pending withdrawals, etc.
+CREATE TABLE account_holds (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    amount_cents BIGINT NOT NULL CHECK (amount_cents > 0),
+    reason VARCHAR(200),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'RELEASED', 'CAPTURED', 'EXPIRED')),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    released_at TIMESTAMP WITH TIME ZONE
+);
+CREATE INDEX idx_account_holds_account_status ON account_holds (account_id, status);
+CREATE INDEX idx_account_holds_expires_at ON account_holds (expires_at) WHERE status = 'ACTIVE';
+
 -- Maker/Checker transfer approvals.
 CREATE TABLE transfer_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -160,4 +160,24 @@ export async function getLedgerBalanceCents(params: {
   return { balanceCents: Number(q.rows[0].balance_cents) };
 }
 
+export async function getAvailableCustomerBalanceCents(params: {
+  client: PoolClient;
+  accountId: string;
+}): Promise<{ ledgerAccountId: string; balanceCents: number; heldCents: number; availableCents: number }> {
+  const { client, accountId } = params;
+  const ledgerAcc = await ensureCustomerLedgerAccount({ client, accountId });
+  const bal = await getLedgerBalanceCents({ client, ledgerAccountId: ledgerAcc.ledgerAccountId });
+  const holds = await client.query(
+    `SELECT COALESCE(SUM(amount_cents), 0)::bigint AS held_cents
+     FROM account_holds
+     WHERE account_id = $1
+       AND status = 'ACTIVE'
+       AND (expires_at IS NULL OR expires_at > NOW())`,
+    [accountId],
+  );
+  const heldCents = Number(holds.rows[0].held_cents);
+  const availableCents = bal.balanceCents - heldCents;
+  return { ledgerAccountId: ledgerAcc.ledgerAccountId, balanceCents: bal.balanceCents, heldCents, availableCents };
+}
+
 

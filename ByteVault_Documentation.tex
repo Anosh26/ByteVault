@@ -264,9 +264,9 @@ bun run dev
 \subsection{Client}
 \begin{lstlisting}[style=bash]
 cd client
-npm install
+bun install
 cp .env.example .env.local
-npm run dev
+bun run dev
 \end{lstlisting}
 
 \section{Operational Notes}
@@ -278,6 +278,9 @@ docker compose exec -T branch_b_db psql -U admin_b -d branch_b_db < docker/apply
 
 docker compose exec -T branch_a_db psql -U admin_a -d branch_a_db < docker/apply-ledger.sql
 docker compose exec -T branch_b_db psql -U admin_b -d branch_b_db < docker/apply-ledger.sql
+
+docker compose exec -T branch_a_db psql -U admin_a -d branch_a_db < docker/apply-holds.sql
+docker compose exec -T branch_b_db psql -U admin_b -d branch_b_db < docker/apply-holds.sql
 \end{lstlisting}
 
 \subsection{Deep health check}
@@ -286,14 +289,16 @@ curl http://localhost:4000/health/deep
 \end{lstlisting}
 
 \section{Next Implementation Milestones}
-\begin{enumerate}[nosep]
-  \item Phase 1: Post ledger entries for transfers under 2PC (keep cached balance for compatibility). \textbf{Done}.
-  \item Phase 1: Add ledger-derived balance endpoints and drift detection/sync. \textbf{Done}.
-  \item Phase 1: Move insufficient-funds checks to ledger-derived available balance (introduce holds/authorizations).
-  \item Add internal ledger accounts (clearing/suspense/fees) and formalize transfer entry templates.
-  \item Add reversals (immutable corrections) and reconciliation tooling.
-  \item Add integration tests for ledger invariants, idempotency, and 2PC failure modes.
-\end{enumerate}
+\begin{itemize}[nosep]
+  \item[\(\checkmark\)] Phase 1: Post ledger entries for transfers under 2PC (keep cached balance for compatibility).
+  \item[\(\checkmark\)] Phase 1: Add ledger-derived balance endpoints and drift detection/sync.
+  \item[\(\square\)] Phase 1: Move insufficient-funds checks to ledger-derived \emph{available} balance (introduce holds/authorizations). \emph{In progress}.
+  \item[\(\square\)] Add internal ledger accounts (clearing/suspense/fees) and formalize transfer entry templates.
+  \item[\(\square\)] Add reversals (immutable corrections) and reconciliation tooling.
+  \item[\(\square\)] Add integration tests for ledger invariants, idempotency, and 2PC failure modes.
+\end{itemize}
+
+\noindent\textbf{Verification note (dev run):} Backend runs on \texttt{http://localhost:4000} via \texttt{bun run dev}. Client runs on \texttt{http://localhost:3000} via \texttt{bun run dev}.
 
 \end{document}
 

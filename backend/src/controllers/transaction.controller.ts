@@ -1,7 +1,12 @@
 import type { Request, Response } from 'express';
 import crypto from 'crypto';
 import { poolA, poolB } from '../db.ts';
-import { ensureCustomerLedgerAccount, ensureInternalLedgerAccount, postJournalEntry } from '../ledger/ledger.ts';
+import {
+  ensureCustomerLedgerAccount,
+  ensureInternalLedgerAccount,
+  getAvailableCustomerBalanceCents,
+  postJournalEntry,
+} from '../ledger/ledger.ts';
 
 export async function execute2pcTransfer(params: {
   fromAccountId: string;
@@ -25,11 +30,14 @@ export async function execute2pcTransfer(params: {
     await clientA.query('BEGIN');
     await clientB.query('BEGIN');
 
-    // MAIN: lock source account row and validate cached balance (ledger will become source of truth later).
-    const balanceRes = await clientA.query('SELECT balance FROM accounts WHERE id = $1 FOR UPDATE', [fromAccountId]);
+    // MAIN: lock source account row and validate available balance (ledger - holds).
+    // We still keep cached balances for compatibility, but "can spend?" should come from the ledger model.
+    const accLock = await clientA.query('SELECT id FROM accounts WHERE id = $1 FOR UPDATE', [fromAccountId]);
+    if (accLock.rows.length === 0) throw new Error('Account not found');
 
-    if (balanceRes.rows.length === 0 || Number(balanceRes.rows[0].balance) < amount) {
-      throw new Error('Insufficient funds or account not found');
+    const available = await getAvailableCustomerBalanceCents({ client: clientA, accountId: fromAccountId });
+    if (available.availableCents < amountCents) {
+      throw new Error('Insufficient funds');
     }
 
     // Update cached balances (kept for compatibility; later we can derive from ledger).
