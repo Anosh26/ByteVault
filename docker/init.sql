@@ -138,6 +138,7 @@ CREATE TABLE journal_entries (
     kind VARCHAR(40) NOT NULL,
     description TEXT,
     external_ref VARCHAR(120),
+    reversal_of_entry_id UUID REFERENCES journal_entries(id) ON DELETE RESTRICT UNIQUE,
     created_by_employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -155,6 +156,16 @@ CREATE TABLE journal_lines (
 );
 CREATE INDEX idx_journal_lines_entry_id ON journal_lines (entry_id);
 CREATE INDEX idx_journal_lines_ledger_account_id ON journal_lines (ledger_account_id);
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS ledger_daily_balances AS
+SELECT 
+    ledger_account_id,
+    DATE(created_at) as balance_date,
+    SUM(amount_cents) as daily_net_cents
+FROM journal_lines
+GROUP BY ledger_account_id, DATE(created_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_daily_balances ON ledger_daily_balances(ledger_account_id, balance_date);
 
 -- Holds/authorizations: reserved funds that reduce available balance but do not change ledger balance.
 -- Use for card authorizations, pending withdrawals, etc.

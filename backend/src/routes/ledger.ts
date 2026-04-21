@@ -1,4 +1,6 @@
 import express from 'express';
+import { z } from 'zod';
+import { requireIdempotencyKey } from '../middleware/idempotency.ts';
 import { requireEmployeeAuth, requireEmployeeRole } from '../middleware/auth.ts';
 import { asyncHandler, parseOrThrow } from '../utils/http.ts';
 import { poolA } from '../db.ts';
@@ -145,5 +147,93 @@ ledgerRouter.post(
       client.release();
     }
   }),
+);
+
+const reverseEntrySchema = z.object({
+  reason: z.string().min(1)
+});
+
+ledgerRouter.post(
+  '/entries/:id/reverse',
+  requireEmployeeAuth,
+  requireEmployeeRole('ADMIN'),
+  requireIdempotencyKey({ routeTag: 'POST /api/ledger/entries/:id/reverse' }),
+  asyncHandler(async (req, res) => {
+    const originalEntryId = req.params.id;
+    const body = parseOrThrow(reverseEntrySchema, req.body);
+    const client = await poolA().connect();
+    try {
+      await client.query('BEGIN');
+      
+      const entryRes = await client.query(`SELECT * FROM journal_entries WHERE id = $1 FOR UPDATE`, [originalEntryId]);
+      if (entryRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Entry not found' });
+      }
+      
+      const original = entryRes.rows[0];
+      if (original.kind === 'REVERSAL') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Cannot reverse a reversal entry' });
+      }
+
+      const linesRes = await client.query(`SELECT * FROM journal_lines WHERE entry_id = $1`, [originalEntryId]);
+      
+      const reversalLines = linesRes.rows.map(line => ({
+        ledgerAccountId: line.ledger_account_id,
+        amountCents: -Number(line.amount_cents),
+        memo: `Reversal of line ${line.id}`
+      }));
+
+      const result = await postJournalEntry({
+        client,
+        input: {
+          kind: 'REVERSAL',
+          description: `Reversal: ${body.reason}`,
+          externalRef: `REV:${original.external_ref || originalEntryId}`,
+          reversalOfEntryId: originalEntryId,
+          createdByEmployeeId: req.employee!.id,
+          lines: reversalLines
+        }
+      });
+      
+      await client.query('COMMIT');
+      return res.status(201).json(result);
+    } catch (e: any) {
+      await client.query('ROLLBACK').catch(() => {});
+      if (e.code === '23505' && e.constraint === 'uq_reversal') {
+        return res.status(409).json({ error: 'Entry has already been reversed' });
+      }
+      throw e;
+    } finally {
+      client.release();
+    }
+  })
+);
+
+ledgerRouter.get(
+  '/reconciliation/report',
+  requireEmployeeAuth,
+  requireEmployeeRole('ADMIN'),
+  asyncHandler(async (req, res) => {
+    const { start_date, end_date } = req.query;
+    if (!start_date || !end_date) {
+      return res.status(400).json({ error: 'start_date and end_date are required' });
+    }
+
+    const report = await poolA().query(`
+      SELECT 
+        l.code,
+        l.name,
+        SUM(db.daily_net_cents)::bigint AS net_balance_cents
+      FROM ledger_accounts l
+      JOIN ledger_daily_balances db ON l.id = db.ledger_account_id
+      WHERE l.type = 'INTERNAL'
+        AND db.balance_date >= $1 AND db.balance_date <= $2
+      GROUP BY l.id, l.code, l.name
+    `, [start_date, end_date]);
+
+    return res.json({ totals: report.rows });
+  })
 );
 

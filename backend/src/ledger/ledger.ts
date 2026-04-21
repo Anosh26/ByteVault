@@ -7,6 +7,7 @@ export const postEntrySchema = z.object({
   kind: z.string().min(1).max(40),
   description: z.string().max(5000).optional(),
   externalRef: z.string().max(120).optional(),
+  reversalOfEntryId: z.string().uuid().optional(),
   createdByEmployeeId: z.string().uuid().optional(),
   lines: z
     .array(
@@ -128,10 +129,10 @@ export async function postJournalEntry(params: { client: PoolClient; input: Post
   }
 
   const entry = await client.query(
-    `INSERT INTO journal_entries (kind, description, external_ref, created_by_employee_id)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, kind, external_ref, created_at`,
-    [input.kind, input.description ?? null, input.externalRef ?? null, input.createdByEmployeeId ?? null],
+    `INSERT INTO journal_entries (kind, description, external_ref, reversal_of_entry_id, created_by_employee_id)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, kind, external_ref, reversal_of_entry_id, created_at`,
+    [input.kind, input.description ?? null, input.externalRef ?? null, input.reversalOfEntryId ?? null, input.createdByEmployeeId ?? null],
   );
 
   const entryId = entry.rows[0].id as string;
