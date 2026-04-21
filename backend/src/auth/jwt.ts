@@ -24,7 +24,7 @@ export function signEmployeeToken(
 ): string {
   return jwt.sign(claims, getSecret(), {
     algorithm: 'HS256',
-    expiresIn: opts?.expiresIn ?? '2h',
+    expiresIn: (opts?.expiresIn ?? '2h') as any,
     issuer,
     audience,
   });

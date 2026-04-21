@@ -65,7 +65,7 @@ ledgerRouter.get(
   '/customer-accounts/:bankAccountId/balance',
   requireEmployeeAuth,
   asyncHandler(async (req, res) => {
-    const bankAccountId = req.params.bankAccountId;
+    const bankAccountId = String(req.params.bankAccountId);
     const client = await poolA().connect();
     try {
       await client.query('BEGIN');
@@ -99,7 +99,7 @@ ledgerRouter.post(
   requireEmployeeAuth,
   requireEmployeeRole('ADMIN'),
   asyncHandler(async (req, res) => {
-    const bankAccountId = req.params.bankAccountId;
+    const bankAccountId = String(req.params.bankAccountId);
     const client = await poolA().connect();
     try {
       await client.query('BEGIN');
@@ -159,7 +159,7 @@ ledgerRouter.post(
   requireEmployeeRole('ADMIN'),
   requireIdempotencyKey({ routeTag: 'POST /api/ledger/entries/:id/reverse' }),
   asyncHandler(async (req, res) => {
-    const originalEntryId = req.params.id;
+    const originalEntryId = String(req.params.id);
     const body = parseOrThrow(reverseEntrySchema, req.body);
     const client = await poolA().connect();
     try {
@@ -231,7 +231,7 @@ ledgerRouter.get(
       WHERE l.type = 'INTERNAL'
         AND db.balance_date >= $1 AND db.balance_date <= $2
       GROUP BY l.id, l.code, l.name
-    `, [start_date, end_date]);
+    `, [String(start_date), String(end_date)]);
 
     return res.json({ totals: report.rows });
   })
