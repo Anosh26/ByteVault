@@ -14,7 +14,12 @@ Lines are signed integers in cents:
 \subsection{Ledger accounts}
 \begin{itemize}[nosep]
   \item \texttt{CUSTOMER}: one ledger account per customer bank account (\texttt{ref\_account\_id})
-  \item \texttt{INTERNAL}: internal buckets (fees, suspense, clearing)
+  \item \texttt{INTERNAL}: internal buckets structured to balance organizational assets. The standardized \texttt{INTERNAL\_ACCOUNTS} registry currently includes:
+  \begin{itemize}[nosep]
+    \item \texttt{CLEARING\_INTERBRANCH}: Used to settle balances momentarily between the Main and Sub branches during 2PC execution.
+    \item \texttt{SUSPENSE\_GENERAL}: General suspense account for holding funds pending manual reconciliation.
+    \item \texttt{FEE\_REVENUE}: Tracks platform fee revenue from charged services.
+  \end{itemize}
 \end{itemize}
 
 \subsection{Posting}
@@ -35,10 +40,13 @@ During the transition to a ledger-first system, \texttt{accounts.balance} is tre
 \subsection{Insufficient-Funds Checks (Holds)}
 When a transfer request is created by a Maker, the backend checks the ledger's accumulated journal lines minus any active \textbf{holds/authorizations}. If funds are sufficient, an \texttt{account\_holds} record with \texttt{status='ACTIVE'} is created and linked to the pending \texttt{transfer\_request}. During execution (Checker approval), the hold is transitioned to \texttt{CAPTURED}. On rejection, the hold is \texttt{RELEASED}.
 
-\subsection{Inter-branch transfer template (Phase 1)}
-For inter-branch settlement with 2PC, transfers currently post balanced entries in both DBs using an internal clearing account:
+\subsection{Formalized Transfer Templates}
+To reduce error and guarantee balanced postings across diverse financial events, journal entry creation is strictly funneled through standardized templates within \texttt{backend/src/ledger/templates.ts}.
+
+For inter-branch settlement under 2PC, transfers utilize two synchronized templates representing the distributed clearing pipeline:
 \begin{itemize}[nosep]
-  \item \textbf{Main DB} (\texttt{TRANSFER\_OUT}): debit customer / credit clearing
-  \item \textbf{Sub DB} (\texttt{TRANSFER\_IN}): debit clearing / credit customer
+  \item \textbf{Main DB} (\texttt{postInterBranchTransferOutTemplate}): Debits CUSTOMER, credits \texttt{CLEARING\_INTERBRANCH}.
+  \item \textbf{Sub DB} (\texttt{postInterBranchTransferInTemplate}): Debits \texttt{CLEARING\_INTERBRANCH}, credits CUSTOMER.
 \end{itemize}
-This keeps each database internally consistent while 2PC ensures both sides commit together.
+
+Additional templates are also formalized for automated actions, including \texttt{postFeeTemplate} and \texttt{postSuspenseTemplate}, keeping the transaction controllers oblivious to manual accounting parameters and ensuring mathematical soundness at scale.

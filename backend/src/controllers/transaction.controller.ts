@@ -7,6 +7,7 @@ import {
   getAvailableCustomerBalanceCents,
   postJournalEntry,
 } from '../ledger/ledger.ts';
+import { postInterBranchTransferOutTemplate, postInterBranchTransferInTemplate } from '../ledger/templates.ts';
 
 export async function execute2pcTransfer(params: {
   fromAccountId: string;
@@ -53,46 +54,18 @@ export async function execute2pcTransfer(params: {
     await clientB.query('UPDATE accounts SET balance = balance + $1 WHERE id = $2', [amount, toAccountId]);
 
     // Ledger posting template (inter-branch clearing):
-    // - Main:  debit CUSTOMER(from)  / credit INTERNAL(CLEARING)
-    // - Sub:   debit INTERNAL(CLEARING) / credit CUSTOMER(to)
-    const mainCustomer = await ensureCustomerLedgerAccount({ client: clientA, accountId: fromAccountId });
-    const subCustomer = await ensureCustomerLedgerAccount({ client: clientB, accountId: toAccountId });
-
-    const mainClearing = await ensureInternalLedgerAccount({
+    await postInterBranchTransferOutTemplate({
       client: clientA,
-      code: 'CLEARING_INTERBRANCH',
-      name: 'Inter-branch clearing',
-    });
-    const subClearing = await ensureInternalLedgerAccount({
-      client: clientB,
-      code: 'CLEARING_INTERBRANCH',
-      name: 'Inter-branch clearing',
+      fromAccountId,
+      amountCents,
+      txId,
     });
 
-    await postJournalEntry({
-      client: clientA,
-      input: {
-        kind: 'TRANSFER_OUT',
-        description: `Inter-branch transfer out (${txId})`,
-        externalRef: txId,
-        lines: [
-          { ledgerAccountId: mainCustomer.ledgerAccountId, amountCents: -amountCents, memo: 'Debit customer' },
-          { ledgerAccountId: mainClearing.ledgerAccountId, amountCents: amountCents, memo: 'Credit clearing' },
-        ],
-      },
-    });
-
-    await postJournalEntry({
+    await postInterBranchTransferInTemplate({
       client: clientB,
-      input: {
-        kind: 'TRANSFER_IN',
-        description: `Inter-branch transfer in (${txId})`,
-        externalRef: txId,
-        lines: [
-          { ledgerAccountId: subClearing.ledgerAccountId, amountCents: -amountCents, memo: 'Debit clearing' },
-          { ledgerAccountId: subCustomer.ledgerAccountId, amountCents: amountCents, memo: 'Credit customer' },
-        ],
-      },
+      toAccountId,
+      amountCents,
+      txId,
     });
 
     // Keep legacy transaction rows for now (compatibility / UI). Ledger is the real source of truth going forward.
