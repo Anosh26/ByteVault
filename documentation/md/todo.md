@@ -5,4 +5,4 @@
 - [x] Phase 1: Move insufficient-funds checks to ledger-derived *available* balance using holds/authorizations.
 - [x] Add internal ledger accounts (clearing/suspense/fees) and formalize transfer entry templates.
 - [ ] Add reversals (immutable corrections) and reconciliation tooling.
-- [ ] Add integration tests for ledger invariants, idempotency, and 2PC failure modes.
+- [x] Add integration tests for ledger invariants, idempotency, and 2PC failure modes.
