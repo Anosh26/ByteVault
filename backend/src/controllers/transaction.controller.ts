@@ -50,8 +50,11 @@ export async function execute2pcTransfer(params: {
     }
 
     // Update cached balances (kept for compatibility; later we can derive from ledger).
-    await clientA.query('UPDATE accounts SET balance = balance - $1 WHERE id = $2', [amount, fromAccountId]);
-    await clientB.query('UPDATE accounts SET balance = balance + $1 WHERE id = $2', [amount, toAccountId]);
+    const updateA = await clientA.query('UPDATE accounts SET balance = balance - $1 WHERE id = $2', [amount, fromAccountId]);
+    if (updateA.rowCount === 0) throw new Error('Source account not found');
+
+    const updateB = await clientB.query('UPDATE accounts SET balance = balance + $1 WHERE id = $2', [amount, toAccountId]);
+    if (updateB.rowCount === 0) throw new Error('Destination account not found');
 
     // Ledger posting template (inter-branch clearing):
     await postInterBranchTransferOutTemplate({
@@ -84,12 +87,8 @@ export async function execute2pcTransfer(params: {
     await clientA.query(`COMMIT PREPARED '${txId}_A'`);
     await clientB.query(`COMMIT PREPARED '${txId}_B'`);
 
-    clientA
-      .query("UPDATE transactions SET status = 'COMPLETED' WHERE id = $1", [txId])
-      .catch(console.error);
-    clientB
-      .query("UPDATE transactions SET status = 'COMPLETED' WHERE id = $1", [txId])
-      .catch(console.error);
+    await clientA.query("UPDATE transactions SET status = 'COMPLETED' WHERE id = $1", [txId]).catch(() => {});
+    await clientB.query("UPDATE transactions SET status = 'COMPLETED' WHERE id = $1", [txId]).catch(() => {});
 
     return { transactionId: txId };
   } catch (error) {

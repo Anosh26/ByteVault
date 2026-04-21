@@ -156,14 +156,6 @@ transfersRouter.post(
         return res.status(409).json({ error: `Request not pending (status=${row.status})` });
       }
 
-      await client.query(
-        `UPDATE transfer_requests
-         SET status='APPROVED', approved_by_employee_id=$1, updated_at=CURRENT_TIMESTAMP
-         WHERE id=$2`,
-        [emp.id, row.id],
-      );
-      await client.query('COMMIT');
-
       const toResolved =
         row.to_account_id ??
         (await (async () => {
@@ -171,6 +163,8 @@ transfersRouter.post(
           if (!r || r.branch !== 'SUB') throw new Error('to account not found in SUB at approval time');
           return r.accountId;
         })());
+
+      await client.query('COMMIT');
 
       const exec = await execute2pcTransfer({
         fromAccountId: row.from_account_id,
@@ -181,9 +175,9 @@ transfersRouter.post(
 
       await poolA().query(
         `UPDATE transfer_requests
-         SET status='EXECUTED', execution_tx_id=$1, updated_at=CURRENT_TIMESTAMP
-         WHERE id=$2`,
-        [exec.transactionId, row.id],
+         SET status='EXECUTED', approved_by_employee_id=$1, execution_tx_id=$2, updated_at=CURRENT_TIMESTAMP
+         WHERE id=$3`,
+        [emp.id, exec.transactionId, row.id],
       );
 
       await audit({
