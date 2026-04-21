@@ -47,11 +47,11 @@ transfersRouter.post(
     const { fromAccountNumber, toAccountNumber, amount } = req.body as {
       fromAccountNumber?: string;
       toAccountNumber?: string;
-      amount?: number;
+      amount?: string;
     };
 
-    if (!fromAccountNumber || !toAccountNumber || !amount || amount <= 0) {
-      return res.status(400).json({ error: 'fromAccountNumber, toAccountNumber, amount required' });
+    if (!fromAccountNumber || !toAccountNumber || !amount || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) {
+      return res.status(400).json({ error: 'Valid fromAccountNumber, toAccountNumber, amount (string) required' });
     }
 
     const from = await resolveAccountByNumber(fromAccountNumber);
@@ -66,7 +66,7 @@ transfersRouter.post(
       return res.status(400).json({ error: 'to account must belong to SUB branch for settlement' });
     }
 
-    const amountCents = Math.round(amount * 100);
+    const amountCents = Math.round(Number(amount) * 100);
     const client = await poolA().connect();
     let insertId, insertStatus, insertCreatedAt;
     try {
@@ -163,6 +163,13 @@ transfersRouter.post(
           if (!r || r.branch !== 'SUB') throw new Error('to account not found in SUB at approval time');
           return r.accountId;
         })());
+
+      await client.query(
+        `UPDATE transfer_requests
+         SET status='APPROVED', approved_by_employee_id=$1, updated_at=CURRENT_TIMESTAMP
+         WHERE id=$2`,
+        [emp.id, row.id],
+      );
 
       await client.query('COMMIT');
 

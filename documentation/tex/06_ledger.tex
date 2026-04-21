@@ -50,3 +50,40 @@ For inter-branch settlement under 2PC, transfers utilize two synchronized templa
 \end{itemize}
 
 Additional templates are also formalized for automated actions, including \texttt{postFeeTemplate} and \texttt{postSuspenseTemplate}, keeping the transaction controllers oblivious to manual accounting parameters and ensuring mathematical soundness at scale.
+
+\subsection{Reversals (Immutable Corrections)}
+An entry is never deleted. Corrections are applied by posting a \textbf{reversal entry} that mirrors the original lines with inverted amounts.
+
+Schema support:
+\begin{itemize}[nosep]
+  \item \texttt{journal\_entries.reversal\_of\_entry\_id} --- nullable FK back to the original entry.
+  \item \texttt{UNIQUE(reversal\_of\_entry\_id)} --- prevents double-reversal of the same entry.
+\end{itemize}
+
+Endpoint: \texttt{POST /api/ledger/entries/:id/reverse}
+\begin{itemize}[nosep]
+  \item Requires \texttt{ADMIN} role, idempotency key, and a mandatory \texttt{reason} string.
+  \item Rejects attempts to reverse a \texttt{REVERSAL} entry (400).
+  \item Returns \texttt{409 Conflict} if the entry has already been reversed (unique constraint catch).
+\end{itemize}
+
+\subsection{Reconciliation Tooling}
+A materialized view \texttt{ledger\_daily\_balances} pre-aggregates journal lines by ledger account and date to avoid full-table scans during reporting.
+
+Endpoint: \texttt{GET /api/ledger/reconciliation/report?start\_date=\dots\&end\_date=\dots}
+\begin{itemize}[nosep]
+  \item Requires \texttt{ADMIN} role.
+  \item Returns net balance in cents for each \texttt{INTERNAL} ledger account within the date range.
+  \item Clearing accounts should net to zero; non-zero values indicate unsettled discrepancies.
+\end{itemize}
+
+\subsection{Transaction Hardening}
+Several critical safety measures are enforced in the 2PC execution path:
+\begin{itemize}[nosep]
+  \item \textbf{Row-count validation}: Cached balance updates (\texttt{UPDATE accounts}) are verified via \texttt{rowCount}. A zero-row update on either branch throws immediately, preventing silent fund loss.
+  \item \textbf{2PC phase separation}: A \texttt{phase2} flag tracks whether \texttt{COMMIT PREPARED} has begun. After entering phase 2, the catch block never issues \texttt{ROLLBACK PREPARED}, preventing partial-commit / partial-rollback split-brain states.
+  \item \textbf{Crash-safe approval}: The \texttt{APPROVED} status is committed atomically before releasing the row lock and before invoking \texttt{execute2pcTransfer}. If the process crashes mid-2PC, the request is already \texttt{APPROVED}, preventing re-approval and double-spend.
+  \item \textbf{Hold release on failure}: If the 2PC execution fails, the catch block releases the associated \texttt{account\_holds} record to prevent permanent fund locking.
+  \item \textbf{Connection pool limits}: Both pools enforce \texttt{max: 20}, \texttt{idleTimeoutMillis: 30000}, and \texttt{connectionTimeoutMillis: 2000}.
+  \item \textbf{Currency as string}: The Maker route accepts \texttt{amount} as a string, validated via regex (\texttt{/\^{}\textbackslash d+(\textbackslash.\textbackslash d\{1,2\})?\$/}), eliminating IEEE 754 floating-point precision loss.
+\end{itemize}

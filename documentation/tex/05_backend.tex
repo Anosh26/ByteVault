@@ -74,8 +74,10 @@ Payment/transfer routes require an \texttt{Idempotency-Key} header. The backend:
 \begin{itemize}[nosep]
   \item \texttt{POST /api/ledger/entries}
   \item \texttt{GET /api/ledger/entries/:id}
+  \item \texttt{POST /api/ledger/entries/:id/reverse} (requires \texttt{reason}, idempotency key; 409 on double-reversal)
   \item \texttt{GET /api/ledger/customer-accounts/:bankAccountId/balance} (\texttt{ledger.balanceCents}, \texttt{holds.heldCents}, \texttt{holds.availableCents}, cached + delta)
   \item \texttt{POST /api/ledger/customer-accounts/:bankAccountId/sync-to-cached} (Admin)
+  \item \texttt{GET /api/ledger/reconciliation/report?start\_date=\dots\&end\_date=\dots} (INTERNAL account net balances)
 \end{itemize}
 
 \paragraph{Holds / authorizations (Admin-only for now)}

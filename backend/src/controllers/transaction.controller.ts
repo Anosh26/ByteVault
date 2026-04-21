@@ -23,6 +23,7 @@ export async function execute2pcTransfer(params: {
   const clientA = await poolA().connect();
   const clientB = await poolB().connect();
 
+  let phase2 = false;
   try {
     await clientA.query('SET statement_timeout = 5000');
     await clientB.query('SET statement_timeout = 5000');
@@ -84,8 +85,14 @@ export async function execute2pcTransfer(params: {
     await clientA.query(`PREPARE TRANSACTION '${txId}_A'`);
     await clientB.query(`PREPARE TRANSACTION '${txId}_B'`);
 
-    await clientA.query(`COMMIT PREPARED '${txId}_A'`);
-    await clientB.query(`COMMIT PREPARED '${txId}_B'`);
+    phase2 = true;
+    try {
+      await clientA.query(`COMMIT PREPARED '${txId}_A'`);
+      await clientB.query(`COMMIT PREPARED '${txId}_B'`);
+    } catch (commitErr) {
+      console.error('CRITICAL: COMMIT PREPARED failed', txId, commitErr);
+      throw commitErr;
+    }
 
     await clientA.query("UPDATE transactions SET status = 'COMPLETED' WHERE id = $1", [txId]).catch(() => {});
     await clientB.query("UPDATE transactions SET status = 'COMPLETED' WHERE id = $1", [txId]).catch(() => {});
@@ -94,13 +101,15 @@ export async function execute2pcTransfer(params: {
   } catch (error) {
     console.error('Distributed transaction failed, initiating rollback:', error);
 
-    try {
-      await clientA.query('ROLLBACK').catch(() => {});
-      await clientB.query('ROLLBACK').catch(() => {});
-      await clientA.query(`ROLLBACK PREPARED '${txId}_A'`).catch(() => {});
-      await clientB.query(`ROLLBACK PREPARED '${txId}_B'`).catch(() => {});
-    } catch (rollbackError) {
-      console.error('CRITICAL: Manual operator intervention required to resolve 2PC locks', rollbackError);
+    if (!phase2) {
+      try {
+        await clientA.query('ROLLBACK').catch(() => {});
+        await clientB.query('ROLLBACK').catch(() => {});
+        await clientA.query(`ROLLBACK PREPARED '${txId}_A'`).catch(() => {});
+        await clientB.query(`ROLLBACK PREPARED '${txId}_B'`).catch(() => {});
+      } catch (rollbackError) {
+        console.error('CRITICAL: Manual operator intervention required to resolve 2PC locks', rollbackError);
+      }
     }
 
     throw error;
