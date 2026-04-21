@@ -1,0 +1,34 @@
+\section{Databases}
+\subsection{Containers}
+Two Postgres containers are used:
+\begin{itemize}[nosep]
+  \item \textbf{Main DB}: \texttt{branch\_a\_db} (container \texttt{bytevault\_branch\_a})
+  \item \textbf{Sub DB}: \texttt{branch\_b\_db} (container \texttt{bytevault\_branch\_b})
+\end{itemize}
+
+\subsection{FDW}
+Main imports a subset of Sub tables into schema \texttt{fdw\_sub}:
+\begin{itemize}[nosep]
+  \item \texttt{branches}, \texttt{users}, \texttt{employees}, \texttt{accounts}, \texttt{transactions}, \texttt{external\_transfers}
+\end{itemize}
+
+This enables Main to resolve Sub entities without direct Sub DB access from the client.
+
+\subsection{2PC}
+Cross-branch settlement uses Postgres prepared transactions:
+\begin{itemize}[nosep]
+  \item \texttt{PREPARE TRANSACTION}
+  \item \texttt{COMMIT PREPARED} / \texttt{ROLLBACK PREPARED}
+\end{itemize}
+
+\textbf{Important:} Postgres must have \texttt{max\_prepared\_transactions > 0}. This is configured in \texttt{docker/custom.conf}.
+
+\subsection{Core schema (high-level)}
+The schema includes:
+\begin{itemize}[nosep]
+  \item Operational tables: \texttt{branches}, \texttt{users}, \texttt{employees}, \texttt{accounts}
+  \item Transfer workflow: \texttt{transfer\_requests} (maker/checker)
+  \item Idempotency: \texttt{idempotency\_keys}
+  \item Auditing: \texttt{audit\_logs}
+  \item Ledger (double-entry): \texttt{ledger\_accounts}, \texttt{journal\_entries}, \texttt{journal\_lines}
+\end{itemize}

@@ -5,6 +5,7 @@ import { poolA } from '../db.ts';
 import {
   ensureCustomerLedgerAccount,
   getLedgerBalanceCents,
+  getAvailableCustomerBalanceCents,
   ensureInternalLedgerAccount,
   postJournalEntry,
   postEntrySchema,
@@ -66,18 +67,18 @@ ledgerRouter.get(
     const client = await poolA().connect();
     try {
       await client.query('BEGIN');
-      const ledgerAcc = await ensureCustomerLedgerAccount({ client, accountId: bankAccountId });
-      const bal = await getLedgerBalanceCents({ client, ledgerAccountId: ledgerAcc.ledgerAccountId });
+      const avail = await getAvailableCustomerBalanceCents({ client, accountId: bankAccountId });
       const cached = await client.query(`SELECT balance, account_number FROM accounts WHERE id=$1`, [bankAccountId]);
       await client.query('COMMIT');
 
       if (cached.rows.length === 0) return res.status(404).json({ error: 'Account not found' });
 
       const cachedCents = Math.round(Number(cached.rows[0].balance) * 100);
-      const deltaCents = bal.balanceCents - cachedCents;
+      const deltaCents = avail.balanceCents - cachedCents;
       return res.json({
         account: { id: bankAccountId, accountNumber: cached.rows[0].account_number },
-        ledger: { ledgerAccountId: ledgerAcc.ledgerAccountId, balanceCents: bal.balanceCents },
+        ledger: { ledgerAccountId: avail.ledgerAccountId, balanceCents: avail.balanceCents },
+        holds: { heldCents: avail.heldCents, availableCents: avail.availableCents },
         cached: { balanceCents: cachedCents },
         deltaCents,
       });

@@ -1,0 +1,15 @@
+\section{Goals and Constraints}
+\subsection{Banking correctness goals}
+\begin{itemize}[nosep]
+  \item \textbf{ACID}: transactional correctness for all money movements.
+  \item \textbf{Idempotency}: all payment/transfer routes accept idempotency keys to prevent duplicate execution.
+  \item \textbf{Auditability}: sensitive operations are written to an audit log.
+  \item \textbf{Maker/Checker}: transfer requests are created by Maker and executed only after Checker approval.
+\end{itemize}
+
+\subsection{Architecture constraints}
+\begin{itemize}[nosep]
+  \item Main branch DB is \textbf{local} and imports Sub branch tables via FDW (\texttt{fdw\_sub.*}).
+  \item Schemas are mirrored between Main and Sub.
+  \item Backend communicates to each DB using separate connection strings.
+\end{itemize}

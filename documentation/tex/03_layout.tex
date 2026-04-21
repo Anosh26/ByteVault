@@ -1,0 +1,13 @@
+\section{Repository Layout}
+\begin{longtable}{@{}ll@{}}
+\toprule
+Path & Purpose \\
+\midrule
+\texttt{docker-compose.yml} & Starts Main and Sub Postgres containers \\
+\texttt{docker/init.sql} & Schema bootstrap (mirrored tables + FDW setup on Main) \\
+\texttt{docker/custom.conf} & Postgres runtime config (timeouts, listen\_addresses, 2PC) \\
+\texttt{docker/apply-*.sql} & Apply migrations to existing DB volumes \\
+\texttt{backend/} & Bun + Express API server \\
+\texttt{client/} & Next.js frontend \\
+\bottomrule
+\end{longtable}

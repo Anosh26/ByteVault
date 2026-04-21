@@ -1,0 +1,11 @@
+\section{Next Implementation Milestones}
+\begin{itemize}[nosep]
+  \item[\(\checkmark\)] Phase 1: Post ledger entries for transfers under 2PC (keep cached balance for compatibility).
+  \item[\(\checkmark\)] Phase 1: Add ledger-derived balance endpoints and drift detection/sync.
+  \item[\(\checkmark\)] Phase 1: Move insufficient-funds checks to ledger-derived \emph{available} balance using holds/authorizations.
+  \item[\(\square\)] Add internal ledger accounts (clearing/suspense/fees) and formalize transfer entry templates.
+  \item[\(\square\)] Add reversals (immutable corrections) and reconciliation tooling.
+  \item[\(\square\)] Add integration tests for ledger invariants, idempotency, and 2PC failure modes.
+\end{itemize}
+
+\noindent\textbf{Verification note (dev run):} Backend runs on \texttt{http://localhost:4000} via \texttt{bun run dev}. Client runs on \texttt{http://localhost:3000} via \texttt{bun run dev}.

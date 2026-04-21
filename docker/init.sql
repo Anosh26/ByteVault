@@ -183,6 +183,9 @@ CREATE TABLE transfer_requests (
     -- Optional resolved UUID in the foreign branch (cannot be a FK here).
     to_account_id UUID,
 
+    -- Link to the hold placed on the source account's funds.
+    hold_id UUID REFERENCES account_holds(id) ON DELETE SET NULL,
+
     amount DECIMAL(15, 2) NOT NULL CHECK (amount > 0),
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED')),
     rejection_reason TEXT,

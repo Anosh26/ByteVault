@@ -1,0 +1,86 @@
+\section{Backend (Bun + Express)}
+\subsection{Runtime configuration}
+Backend reads environment variables from \texttt{backend/.env}. Example:
+\begin{lstlisting}[style=bash]
+PORT=4000
+BRANCH_A_DB_URL=postgresql://admin_a:secure_password_a@localhost:55432/branch_a_db
+BRANCH_B_DB_URL=postgresql://admin_b:secure_password_b@localhost:55433/branch_b_db
+JWT_SECRET=change_me_to_a_long_random_string
+JWT_ISSUER=bytevault
+JWT_AUDIENCE=bytevault-client
+\end{lstlisting}
+
+\subsection{Logging and debugging}
+Every request logs:
+\begin{itemize}[nosep]
+  \item request start/end
+  \item correlation id \texttt{x-request-id}
+  \item method, path, status, latency (ms)
+  \item employee id/role (when authenticated)
+\end{itemize}
+
+\subsection{Health endpoints}
+\begin{itemize}[nosep]
+  \item \texttt{GET /health}: basic liveness
+  \item \texttt{GET /health/deep}: DB A, DB B, FDW presence, 2PC readiness
+\end{itemize}
+
+\subsection{Authentication and RBAC}
+\begin{itemize}[nosep]
+  \item Employee login issues JWT access tokens.
+  \item RBAC roles: \texttt{MAKER}, \texttt{CHECKER}, \texttt{MANAGER}, \texttt{ADMIN}
+  \item Authorization is enforced server-side using middleware.
+\end{itemize}
+
+\subsection{Idempotency}
+Payment/transfer routes require an \texttt{Idempotency-Key} header. The backend:
+\begin{itemize}[nosep]
+  \item stores request hash and response snapshot
+  \item returns prior response on repeated requests (same key, same body)
+  \item marks failures as \texttt{FAILED} to avoid stuck \texttt{IN\_PROGRESS}
+\end{itemize}
+
+\subsection{Current API surface (summary)}
+\paragraph{Auth}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/auth/employee/login}
+  \item \texttt{GET /api/auth/me}
+\end{itemize}
+
+\paragraph{Users}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/users}
+  \item \texttt{GET /api/users?limit=\dots\&offset=\dots}
+  \item \texttt{GET /api/users/:id}
+\end{itemize}
+
+\paragraph{Accounts}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/accounts}
+  \item \texttt{GET /api/accounts?limit=\dots\&offset=\dots}
+  \item \texttt{GET /api/accounts/:id}
+  \item \texttt{GET /api/accounts/by-number/:accountNumber}
+\end{itemize}
+
+\paragraph{Transfers (Maker/Checker)}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/transfers/requests} (Maker)
+  \item \texttt{POST /api/transfers/requests/:id/approve} (Checker; executes 2PC)
+  \item \texttt{POST /api/transfers/requests/:id/reject} (Checker)
+  \item \texttt{GET /api/transfers/requests}
+\end{itemize}
+
+\paragraph{Ledger (Admin only for now)}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/ledger/entries}
+  \item \texttt{GET /api/ledger/entries/:id}
+  \item \texttt{GET /api/ledger/customer-accounts/:bankAccountId/balance} (\texttt{ledger.balanceCents}, \texttt{holds.heldCents}, \texttt{holds.availableCents}, cached + delta)
+  \item \texttt{POST /api/ledger/customer-accounts/:bankAccountId/sync-to-cached} (Admin)
+\end{itemize}
+
+\paragraph{Holds / authorizations (Admin-only for now)}
+\begin{itemize}[nosep]
+  \item \texttt{POST /api/holds} (create hold)
+  \item \texttt{POST /api/holds/:id/release} (release or capture)
+  \item \texttt{GET /api/holds/by-account/:accountId?status=ACTIVE} (list)
+\end{itemize}

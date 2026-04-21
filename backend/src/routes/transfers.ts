@@ -4,6 +4,7 @@ import { poolA } from '../db.ts';
 import { requireEmployeeAuth, requireEmployeeRole } from '../middleware/auth.ts';
 import { requireIdempotencyKey } from '../middleware/idempotency.ts';
 import { execute2pcTransfer } from '../controllers/transaction.controller.ts';
+import { getAvailableCustomerBalanceCents } from '../ledger/ledger.ts';
 
 type ResolveResult = { accountId: string; branch: 'MAIN' | 'SUB' };
 
@@ -67,25 +68,52 @@ transfersRouter.post(
       return res.status(400).json({ error: 'to account must belong to SUB branch for settlement' });
     }
 
-    const insert = await poolA().query(
-      `INSERT INTO transfer_requests (
-         created_by_employee_id,
-         from_account_id, to_account_number, to_account_id,
-         amount, status
-       ) VALUES ($1, $2, $3, $4, $5, 'PENDING')
-       RETURNING id, status, created_at`,
-      [emp.id, from.accountId, toAccountNumber, to.accountId, amount],
-    );
+    const amountCents = Math.round(amount * 100);
+    const client = await poolA().connect();
+    let insertId, insertStatus, insertCreatedAt;
+    try {
+      await client.query('BEGIN');
+      const available = await getAvailableCustomerBalanceCents({ client, accountId: from.accountId });
+      if (available.availableCents < amountCents) {
+        throw new Error('Insufficient funds');
+      }
+
+      const holdRes = await client.query(
+        `INSERT INTO account_holds (account_id, amount_cents, reason, status)
+         VALUES ($1, $2, 'Transfer Request', 'ACTIVE') RETURNING id`,
+        [from.accountId, amountCents]
+      );
+
+      const insertRes = await client.query(
+        `INSERT INTO transfer_requests (
+           created_by_employee_id,
+           from_account_id, to_account_number, to_account_id,
+           amount, hold_id, status
+         ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')
+         RETURNING id, status, created_at`,
+        [emp.id, from.accountId, toAccountNumber, to.accountId, amount, holdRes.rows[0].id],
+      );
+      
+      insertId = insertRes.rows[0].id;
+      insertStatus = insertRes.rows[0].status;
+      insertCreatedAt = insertRes.rows[0].created_at;
+      await client.query('COMMIT');
+    } catch (e: any) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: e.message || 'Transfer request failed' });
+    } finally {
+      client.release();
+    }
 
     await audit({
       actorEmployeeId: emp.id,
       action: 'TRANSFER_REQUEST_CREATED',
       entityType: 'transfer_request',
-      entityId: insert.rows[0].id,
+      entityId: insertId,
       meta: { fromAccountNumber, toAccountNumber, amount },
     });
 
-    return res.status(201).json({ request: insert.rows[0] });
+    return res.status(201).json({ request: { id: insertId, status: insertStatus, created_at: insertCreatedAt } });
   },
 );
 
@@ -104,7 +132,7 @@ transfersRouter.post(
       await client.query('BEGIN');
 
       const q = await client.query(
-        `SELECT id, from_account_id, to_account_number, to_account_id, amount, status
+        `SELECT id, from_account_id, to_account_number, to_account_id, amount, hold_id, status
          FROM transfer_requests
          WHERE id = $1
          FOR UPDATE`,
@@ -121,6 +149,7 @@ transfersRouter.post(
         to_account_number: string;
         to_account_id: string | null;
         amount: string;
+        hold_id: string | null;
         status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXECUTED' | 'FAILED';
       };
 
@@ -150,6 +179,7 @@ transfersRouter.post(
         fromAccountId: row.from_account_id,
         toAccountId: toResolved,
         amount: Number(row.amount),
+        holdId: row.hold_id ?? undefined,
       });
 
       await poolA().query(
@@ -207,18 +237,36 @@ transfersRouter.post(
     const id = req.params.id;
     const { reason } = req.body as { reason?: string };
 
-    const q = await poolA().query(
-      `UPDATE transfer_requests
-       SET status='REJECTED',
-           approved_by_employee_id=$1,
-           rejection_reason=$2,
-           updated_at=CURRENT_TIMESTAMP
-       WHERE id=$3 AND status='PENDING'
-       RETURNING id, status`,
-      [emp.id, reason ?? null, id],
-    );
+    const client = await poolA().connect();
+    let q;
+    try {
+      await client.query('BEGIN');
+      q = await client.query(
+        `UPDATE transfer_requests
+         SET status='REJECTED',
+             approved_by_employee_id=$1,
+             rejection_reason=$2,
+             updated_at=CURRENT_TIMESTAMP
+         WHERE id=$3 AND status='PENDING'
+         RETURNING id, status, hold_id`,
+        [emp.id, reason ?? null, id],
+      );
 
-    if (q.rows.length === 0) return res.status(404).json({ error: 'Transfer request not found or not pending' });
+      if (q.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Transfer request not found or not pending' });
+      }
+
+      if (q.rows[0].hold_id) {
+        await client.query(
+          `UPDATE account_holds SET status = 'RELEASED', released_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = 'ACTIVE'`,
+          [q.rows[0].hold_id]
+        );
+      }
+      await client.query('COMMIT');
+    } finally {
+      client.release();
+    }
 
     await audit({
       actorEmployeeId: emp.id,

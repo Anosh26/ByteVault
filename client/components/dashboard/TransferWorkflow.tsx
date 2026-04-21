@@ -6,6 +6,14 @@ import { newIdempotencyKey } from '@/lib/idempotency';
 import { formatInr } from '@/lib/format';
 import type { Employee, TransferRequestRow } from '@/lib/types';
 
+type BalanceInfo = {
+  account: { id: string; accountNumber: string };
+  ledger: { ledgerAccountId: string; balanceCents: number };
+  holds: { heldCents: number; availableCents: number };
+  cached: { balanceCents: number };
+  deltaCents: number;
+};
+
 function roleCanCreate(role: Employee['role']): boolean {
   return role === 'MAKER' || role === 'MANAGER' || role === 'ADMIN';
 }
@@ -24,6 +32,9 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
   const [amount, setAmount] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+
+  const [fromBalance, setFromBalance] = useState<BalanceInfo | null>(null);
+  const [fromBalanceLoading, setFromBalanceLoading] = useState(false);
 
   const [rejectDrafts, setRejectDrafts] = useState<Record<string, string>>({});
   const [actionError, setActionError] = useState<string | null>(null);
@@ -47,6 +58,25 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
     void loadRequests();
   }, [loadRequests]);
 
+  const refreshFromBalance = useCallback(async (acctNumber: string) => {
+    const n = acctNumber.trim();
+    if (!n) {
+      setFromBalance(null);
+      return;
+    }
+    setFromBalanceLoading(true);
+    try {
+      const acc = await api.get<{ account: { id: string; account_number: string } }>(`/api/accounts/by-number/${encodeURIComponent(n)}`);
+      const accountId = acc.data.account.id;
+      const bal = await api.get<BalanceInfo>(`/api/ledger/customer-accounts/${accountId}/balance`);
+      setFromBalance(bal.data);
+    } catch {
+      setFromBalance(null);
+    } finally {
+      setFromBalanceLoading(false);
+    }
+  }, []);
+
   async function onCreateRequest(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
@@ -69,6 +99,7 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
       setFromAccountNumber('');
       setToAccountNumber('');
       setAmount('');
+      setFromBalance(null);
       await loadRequests();
     } catch (err: unknown) {
       const msg =
@@ -138,9 +169,25 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
               <input
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 value={fromAccountNumber}
-                onChange={(e) => setFromAccountNumber(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFromAccountNumber(v);
+                  void refreshFromBalance(v);
+                }}
                 placeholder="MAIN branch"
               />
+              <div className="mt-2 text-xs text-slate-400">
+                {fromBalanceLoading ? (
+                  <span>Checking available balance…</span>
+                ) : fromBalance ? (
+                  <span>
+                    Available {formatInr(fromBalance.holds.availableCents / 100)} · Held {formatInr(fromBalance.holds.heldCents / 100)} · Ledger{' '}
+                    {formatInr(fromBalance.ledger.balanceCents / 100)}
+                  </span>
+                ) : fromAccountNumber.trim() ? (
+                  <span>Balance unavailable (account not found yet).</span>
+                ) : null}
+              </div>
             </div>
             <div>
               <label className="text-xs font-medium uppercase tracking-wide text-slate-500">To account #</label>

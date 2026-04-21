@@ -13,6 +13,7 @@ import { log } from './src/utils/logger.ts';
 import { usersRouter } from './src/routes/users.ts';
 import { accountsRouter } from './src/routes/accounts.ts';
 import { ledgerRouter } from './src/routes/ledger.ts';
+import { holdsRouter } from './src/routes/holds.ts';
 
 dotenv.config();
 
@@ -73,6 +74,7 @@ app.use('/api/dev', devRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/accounts', accountsRouter);
 app.use('/api/ledger', ledgerRouter);
+app.use('/api/holds', holdsRouter);
 
 // Temporary: direct 2PC transfer is protected (will become checker-approved flow next).
 app.post(

@@ -1,0 +1,44 @@
+\section{Ledger (Double-Entry Accounting)}
+\subsection{Concept}
+Money movement is represented as a \textbf{journal entry} with multiple \textbf{journal lines}:
+\[
+\sum_{i=1}^{n} \text{amount\_cents}_i = 0
+\]
+
+Lines are signed integers in cents:
+\begin{itemize}[nosep]
+  \item Positive = credit
+  \item Negative = debit
+\end{itemize}
+
+\subsection{Ledger accounts}
+\begin{itemize}[nosep]
+  \item \texttt{CUSTOMER}: one ledger account per customer bank account (\texttt{ref\_account\_id})
+  \item \texttt{INTERNAL}: internal buckets (fees, suspense, clearing)
+\end{itemize}
+
+\subsection{Posting}
+Posting is performed in a SQL transaction:
+\begin{itemize}[nosep]
+  \item validate balanced lines
+  \item insert \texttt{journal\_entries}
+  \item insert \texttt{journal\_lines}
+\end{itemize}
+
+\subsection{Cached balance compatibility}
+During the transition to a ledger-first system, \texttt{accounts.balance} is treated as a \textbf{cached} value for compatibility. The system supports:
+\begin{itemize}[nosep]
+  \item Auto-creation of an \texttt{OPENING\_BALANCE} entry (idempotent, per account) so ledger and cache start aligned.
+  \item A privileged sync endpoint (\texttt{sync-to-cached}) which posts a balanced adjustment entry if drift is detected.
+\end{itemize}
+
+\subsection{Insufficient-Funds Checks (Holds)}
+When a transfer request is created by a Maker, the backend checks the ledger's accumulated journal lines minus any active \textbf{holds/authorizations}. If funds are sufficient, an \texttt{account\_holds} record with \texttt{status='ACTIVE'} is created and linked to the pending \texttt{transfer\_request}. During execution (Checker approval), the hold is transitioned to \texttt{CAPTURED}. On rejection, the hold is \texttt{RELEASED}.
+
+\subsection{Inter-branch transfer template (Phase 1)}
+For inter-branch settlement with 2PC, transfers currently post balanced entries in both DBs using an internal clearing account:
+\begin{itemize}[nosep]
+  \item \textbf{Main DB} (\texttt{TRANSFER\_OUT}): debit customer / credit clearing
+  \item \textbf{Sub DB} (\texttt{TRANSFER\_IN}): debit clearing / credit customer
+\end{itemize}
+This keeps each database internally consistent while 2PC ensures both sides commit together.

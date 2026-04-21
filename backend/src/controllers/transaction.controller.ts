@@ -12,8 +12,9 @@ export async function execute2pcTransfer(params: {
   fromAccountId: string;
   toAccountId: string;
   amount: number;
+  holdId?: string;
 }): Promise<{ transactionId: string }> {
-  const { fromAccountId, toAccountId, amount } = params;
+  const { fromAccountId, toAccountId, amount, holdId } = params;
 
   const txId = `tx_${crypto.randomUUID().replace(/-/g, '')}`;
   const amountCents = Math.round(amount * 100);
@@ -34,6 +35,13 @@ export async function execute2pcTransfer(params: {
     // We still keep cached balances for compatibility, but "can spend?" should come from the ledger model.
     const accLock = await clientA.query('SELECT id FROM accounts WHERE id = $1 FOR UPDATE', [fromAccountId]);
     if (accLock.rows.length === 0) throw new Error('Account not found');
+
+    if (holdId) {
+      await clientA.query(
+        `UPDATE account_holds SET status = 'CAPTURED', released_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = 'ACTIVE'`,
+        [holdId]
+      );
+    }
 
     const available = await getAvailableCustomerBalanceCents({ client: clientA, accountId: fromAccountId });
     if (available.availableCents < amountCents) {

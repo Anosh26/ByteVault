@@ -1,0 +1,21 @@
+\section{Operational Notes}
+\subsection{Applying migrations to existing volumes}
+If DB volumes already exist, apply incremental scripts:
+\begin{lstlisting}[style=bash]
+docker compose exec -T branch_a_db psql -U admin_a -d branch_a_db < docker/apply-security.sql
+docker compose exec -T branch_b_db psql -U admin_b -d branch_b_db < docker/apply-security.sql
+
+docker compose exec -T branch_a_db psql -U admin_a -d branch_a_db < docker/apply-ledger.sql
+docker compose exec -T branch_b_db psql -U admin_b -d branch_b_db < docker/apply-ledger.sql
+
+docker compose exec -T branch_a_db psql -U admin_a -d branch_a_db < docker/apply-holds.sql
+docker compose exec -T branch_b_db psql -U admin_b -d branch_b_db < docker/apply-holds.sql
+
+cat docker/apply-transfer-holds.sql | docker compose exec -T branch_a_db psql -U admin_a -d branch_a_db
+cat docker/apply-transfer-holds.sql | docker compose exec -T branch_b_db psql -U admin_b -d branch_b_db
+\end{lstlisting}
+
+\subsection{Deep health check}
+\begin{lstlisting}[style=bash]
+curl http://localhost:4000/health/deep
+\end{lstlisting}

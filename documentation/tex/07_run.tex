@@ -1,0 +1,23 @@
+\section{How to Run (Development)}
+\subsection{Databases}
+From repo root:
+\begin{lstlisting}[style=bash]
+docker compose up -d
+docker compose ps
+\end{lstlisting}
+
+\subsection{Backend}
+\begin{lstlisting}[style=bash]
+cd backend
+bun install
+cp .env.example .env
+bun run dev
+\end{lstlisting}
+
+\subsection{Client}
+\begin{lstlisting}[style=bash]
+cd client
+bun install
+cp .env.example .env.local
+bun run dev
+\end{lstlisting}
