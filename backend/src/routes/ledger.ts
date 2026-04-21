@@ -60,6 +60,21 @@ ledgerRouter.get(
   }),
 );
 
+ledgerRouter.get(
+  '/entries',
+  requireEmployeeAuth,
+  requireEmployeeRole('ADMIN'),
+  asyncHandler(async (req, res) => {
+    const limit = Number(req.query.limit) || 50;
+    const offset = Number(req.query.offset) || 0;
+    const entries = await poolA().query(
+      `SELECT * FROM journal_entries ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    res.json({ entries: entries.rows });
+  }),
+);
+
 // Balance from ledger for a banking account (Main DB only; Sub balances are visible via FDW when needed).
 ledgerRouter.get(
   '/customer-accounts/:bankAccountId/balance',

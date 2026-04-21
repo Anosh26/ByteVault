@@ -1,9 +1,9 @@
-// app/login/page.tsx
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
+import { Shield, Lock, Mail, Loader2, Sparkles } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,14 +21,10 @@ export default function LoginPage() {
       const { accessToken } = res.data ?? {};
       if (!accessToken) throw new Error('No access token returned');
       window.localStorage.setItem('bytevault_access_token', accessToken);
-      // Let proxy.ts protect routes (server-readable cookie; not a security boundary).
       document.cookie = `bv_logged_in=true; path=/; max-age=${60 * 60 * 2}`;
       router.push('/dashboard');
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.error ||
-        err?.message ||
-        'Login failed';
+      const msg = err?.response?.data?.error || err?.message || 'Login failed';
       setError(String(msg));
     } finally {
       setLoading(false);
@@ -36,60 +32,90 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center px-4">
-      <div className="w-full max-w-md space-y-8 rounded-2xl border border-slate-800 bg-slate-900/50 p-8 shadow-2xl backdrop-blur-sm">
-        
-        <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-white">Welcome Back</h2>
-          <p className="mt-2 text-sm text-slate-400">Please enter your credentials to access your vault.</p>
-        </div>
+    <div className="relative flex min-h-[90vh] items-center justify-center px-4 overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute top-1/4 -left-20 h-96 w-96 rounded-full bg-blue-600/10 blur-[100px] animate-float" />
+      <div className="absolute bottom-1/4 -right-20 h-96 w-96 rounded-full bg-purple-600/10 blur-[100px] animate-float" style={{ animationDelay: '-3s' }} />
 
-        <form className="mt-8 space-y-6" onSubmit={onSubmit}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300">Email Address</label>
-              <input 
-                type="email" 
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="name@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="username"
-                required
-              />
+      <div className="relative w-full max-w-md animate-in fade-in zoom-in duration-700">
+        <div className="glass-card p-10 shadow-[0_0_80px_-20px_rgba(59,130,246,0.15)] ring-1 ring-white/10">
+          
+          <div className="flex flex-col items-center">
+            <div className="flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-xl shadow-blue-500/20 mb-6 group cursor-default">
+              <Shield className="h-8 w-8 text-white transition-transform group-hover:scale-110" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300">Password</label>
-              <input 
-                type="password" 
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </div>
+            <h2 className="text-3xl font-black glow-text tracking-tight">Access ByteVault</h2>
+            <p className="mt-2 text-sm text-slate-500 font-medium">Enterprise Distributed Ledger System</p>
           </div>
 
-          {error ? (
-            <div className="rounded-lg border border-red-900/50 bg-red-950/40 p-3 text-sm text-red-200">
-              {error}
+          <form className="mt-10 space-y-5" onSubmit={onSubmit}>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 ml-1">Work Email</label>
+                <div className="relative group">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 transition-colors group-focus-within:text-blue-400" />
+                  <input 
+                    type="email" 
+                    className="input-field pl-11"
+                    placeholder="name@bytevault.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="username"
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 ml-1">Password</label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 transition-colors group-focus-within:text-blue-400" />
+                  <input 
+                    type="password" 
+                    className="input-field pl-11"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+              </div>
             </div>
-          ) : null}
 
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-blue-600 p-3 font-semibold text-white transition-all hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {loading ? 'Signing in…' : 'Sign In to Vault'}
-          </button>
-        </form>
+            {error && (
+              <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs text-red-400 font-bold animate-in shake-in duration-300">
+                {error}
+              </div>
+            )}
 
-        <p className="text-center text-xs text-slate-500">
-          Secure 256-bit AES Encrypted Connection
-        </p>
+            <button 
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full h-12 flex items-center justify-center gap-2 group mt-2"
+            >
+              {loading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 text-blue-200 transition-transform group-hover:rotate-12" />
+                  Authenticate Securely
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-8 pt-8 border-t border-white/5 flex items-center justify-center gap-6">
+            <div className="flex flex-col items-center gap-1.5">
+               <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+               <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">System Ready</span>
+            </div>
+            <div className="flex flex-col items-center gap-1.5 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all cursor-help">
+               <Shield className="h-3 w-3 text-blue-500" />
+               <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">2PC Enforced</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

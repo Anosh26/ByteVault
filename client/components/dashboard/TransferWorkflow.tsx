@@ -5,6 +5,7 @@ import api from '@/lib/axios';
 import { newIdempotencyKey } from '@/lib/idempotency';
 import { formatInr } from '@/lib/format';
 import type { Employee, TransferRequestRow } from '@/lib/types';
+import { ArrowRightLeft, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
 
 type BalanceInfo = {
   account: { id: string; accountNumber: string };
@@ -80,11 +81,13 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
   async function onCreateRequest(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    const n = Number(amount);
-    if (!fromAccountNumber.trim() || !toAccountNumber.trim() || !Number.isFinite(n) || n <= 0) {
-      setFormError('Enter valid account numbers and a positive amount.');
+    
+    // Validate amount string format (same regex as backend)
+    if (!fromAccountNumber.trim() || !toAccountNumber.trim() || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) {
+      setFormError('Enter valid account numbers and a positive amount (e.g. 100.50).');
       return;
     }
+
     setFormLoading(true);
     try {
       await api.post(
@@ -92,7 +95,7 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
         {
           fromAccountNumber: fromAccountNumber.trim(),
           toAccountNumber: toAccountNumber.trim(),
-          amount: n,
+          amount: amount, // Sending as string to avoid precision issues
         },
         { headers: { 'Idempotency-Key': newIdempotencyKey() } },
       );
@@ -103,7 +106,7 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
       await loadRequests();
     } catch (err: unknown) {
       const msg =
-        (err as { response?: { data?: { error?: string; details?: string } } })?.response?.data?.error ??
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
         (err as Error)?.message ??
         'Request failed';
       setFormError(String(msg));
@@ -155,158 +158,198 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {roleCanCreate(employee.role) ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
-          <h3 className="text-lg font-semibold text-white">New inter-branch transfer request</h3>
-          <p className="mt-1 text-sm text-slate-400">
-            From account must be on <span className="text-slate-200">MAIN</span>; to account on{' '}
-            <span className="text-slate-200">SUB</span> (per settlement rules).
+        <div className="glass-card p-6 shadow-2xl shadow-blue-500/5">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-blue-500/10 p-2 text-blue-400">
+              <ArrowRightLeft className="h-5 w-5" />
+            </div>
+            <h3 className="text-xl font-bold glow-text">Initiate Inter-Branch Transfer</h3>
+          </div>
+          <p className="mt-2 text-sm text-slate-400">
+            Source account must reside on <span className="font-semibold text-blue-400">MAIN</span> branch. 
+            Destination on <span className="font-semibold text-purple-400">SUB</span>.
           </p>
-          <form className="mt-4 grid gap-4 sm:grid-cols-3" onSubmit={onCreateRequest}>
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wide text-slate-500">From account #</label>
+          
+          <form className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3" onSubmit={onCreateRequest}>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500">From Account #</label>
               <input
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="input-field"
                 value={fromAccountNumber}
                 onChange={(e) => {
                   const v = e.target.value;
                   setFromAccountNumber(v);
                   void refreshFromBalance(v);
                 }}
-                placeholder="MAIN branch"
+                placeholder="000XXX"
               />
-              <div className="mt-2 text-xs text-slate-400">
+              <div className="min-h-[1.25rem]">
                 {fromBalanceLoading ? (
-                  <span>Checking available balance…</span>
-                ) : fromBalance ? (
-                  <span>
-                    Available {formatInr(fromBalance.holds.availableCents / 100)} · Held {formatInr(fromBalance.holds.heldCents / 100)} · Ledger{' '}
-                    {formatInr(fromBalance.ledger.balanceCents / 100)}
+                  <span className="flex items-center gap-2 text-[10px] text-blue-400/80 animate-pulse">
+                    <Clock className="h-3 w-3" /> Fetching ledger status...
                   </span>
+                ) : fromBalance ? (
+                  <div className="flex flex-col gap-0.5 text-[10px]">
+                    <span className="text-slate-400 italic"> Ledger: {formatInr(fromBalance.ledger.balanceCents / 100)}</span>
+                    <span className="font-bold text-emerald-400"> Available: {formatInr(fromBalance.holds.availableCents / 100)}</span>
+                  </div>
                 ) : fromAccountNumber.trim() ? (
-                  <span>Balance unavailable (account not found yet).</span>
+                  <span className="text-[10px] text-red-400/80">Account not found in registry.</span>
                 ) : null}
               </div>
             </div>
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wide text-slate-500">To account #</label>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500">To Account #</label>
               <input
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="input-field"
                 value={toAccountNumber}
                 onChange={(e) => setToAccountNumber(e.target.value)}
-                placeholder="SUB branch"
+                placeholder="111XXX"
               />
             </div>
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Amount (INR)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Amount (INR)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-sm">₹</span>
+                <input
+                  className="input-field pl-8"
+                  value={amount}
+                  autoComplete="off"
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
             </div>
-            <div className="sm:col-span-3 flex flex-wrap items-center gap-3">
+
+            <div className="sm:col-span-2 lg:col-span-3 flex items-center justify-between gap-4 pt-2">
               <button
                 type="submit"
                 disabled={formLoading}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                className="btn-primary w-full sm:w-auto"
               >
-                {formLoading ? 'Submitting…' : 'Submit request'}
+                {formLoading ? 'Processing Ledger...' : 'Submit Settlement Request'}
               </button>
-              {formError ? <span className="text-sm text-red-300">{formError}</span> : null}
+              {formError && (
+                <div className="flex items-center gap-2 rounded-lg bg-red-500/10 px-4 py-2 text-xs text-red-400 border border-red-500/20">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {formError}
+                </div>
+              )}
             </div>
           </form>
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
-        <div className="flex items-center justify-between gap-4">
-          <h3 className="text-lg font-semibold text-white">Transfer requests</h3>
+      <div className="glass-card glass-card-hover p-6 shadow-xl">
+        <div className="flex items-center justify-between gap-4 border-b border-white/5 pb-4">
+          <div className="flex items-center gap-3">
+             <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400">
+               <Clock className="h-5 w-5" />
+             </div>
+             <h3 className="text-xl font-bold text-white">Transaction Pipeline</h3>
+          </div>
           <button
             type="button"
             onClick={() => void loadRequests()}
-            className="text-sm text-blue-400 hover:text-blue-300"
+            className="text-xs font-bold uppercase tracking-widest text-blue-400 transition-colors hover:text-blue-300"
           >
-            Refresh
+            Refresh Data
           </button>
         </div>
-        {actionError ? (
-          <p className="mt-3 text-sm text-red-300" role="alert">
+
+        {actionError && (
+          <div className="mt-4 flex items-center gap-2 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400 border border-red-500/20 animate-in fade-in zoom-in duration-300">
+            <XCircle className="h-5 w-5 shrink-0" />
             {actionError}
-          </p>
-        ) : null}
-        {listError ? (
-          <p className="mt-3 text-sm text-red-300">{listError}</p>
-        ) : loading ? (
-          <p className="mt-4 text-sm text-slate-400">Loading…</p>
-        ) : requests.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">No transfer requests yet.</p>
-        ) : (
-          <ul className="mt-4 space-y-3">
-            {requests.map((r) => (
-              <li
-                key={r.id}
-                className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/80 p-4 md:flex-row md:items-center md:justify-between"
-              >
-                <div>
-                  <p className="font-mono text-xs text-slate-500">{r.id}</p>
-                  <p className="mt-1 text-lg font-semibold text-white">{formatInr(Number(r.amount))}</p>
-                  <p className="text-xs text-slate-500">
-                    {new Date(r.created_at).toLocaleString()} ·{' '}
-                    <span
-                      className={
-                        r.status === 'EXECUTED'
-                          ? 'text-emerald-400'
-                          : r.status === 'FAILED' || r.status === 'REJECTED'
-                            ? 'text-red-400'
-                            : 'text-amber-300'
-                      }
-                    >
-                      {r.status}
-                    </span>
-                    {r.execution_tx_id ? (
-                      <span className="ml-2 font-mono text-slate-400">tx {r.execution_tx_id}</span>
-                    ) : null}
-                  </p>
-                </div>
-                {r.status === 'PENDING' && roleCanCheck(employee.role) ? (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input
-                      className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-white placeholder-slate-600"
-                      placeholder="Reject reason (optional)"
-                      value={rejectDrafts[r.id] ?? ''}
-                      onChange={(e) =>
-                        setRejectDrafts((prev) => ({ ...prev, [r.id]: e.target.value }))
-                      }
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={actionLoadingId === r.id}
-                        onClick={() => void onApprove(r.id)}
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-60"
-                      >
-                        {actionLoadingId === r.id ? '…' : 'Approve'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={actionLoadingId === r.id}
-                        onClick={() => void onReject(r.id)}
-                        className="rounded-lg border border-red-900/60 bg-red-950/40 px-3 py-1.5 text-sm font-medium text-red-200 hover:bg-red-900/50 disabled:opacity-60"
-                      >
-                        Reject
-                      </button>
+          </div>
+        )}
+
+        <div className="mt-6">
+          {listError ? (
+            <div className="text-center py-12 text-slate-500">{listError}</div>
+          ) : loading ? (
+            <div className="space-y-4">
+               {[1,2,3].map(i => (
+                 <div key={i} className="h-20 w-full rounded-xl bg-slate-900/50 animate-pulse" />
+               ))}
+            </div>
+          ) : requests.length === 0 ? (
+            <div className="text-center py-12 text-slate-600 font-medium italic">Empty pipeline. Use the form above to initiate funds movement.</div>
+          ) : (
+            <ul className="space-y-4">
+              {requests.map((r) => (
+                <li
+                  key={r.id}
+                  className="group relative flex flex-col gap-4 rounded-2xl border border-white/5 bg-slate-950/40 p-5 transition-all hover:bg-slate-950/60 md:flex-row md:items-center md:justify-between"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="mt-1">
+                      {r.status === 'EXECUTED' ? (
+                        <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                      ) : r.status === 'FAILED' || r.status === 'REJECTED' ? (
+                        <XCircle className="h-6 w-6 text-red-500" />
+                      ) : (
+                        <Clock className="h-6 w-6 text-amber-500 animate-pulse" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                         <span className="font-mono text-[10px] font-bold text-slate-600 group-hover:text-slate-400 transition-colors uppercase tracking-tight">{r.id.split('-')[0]}...{r.id.split('-').pop()}</span>
+                         <span className={`badge ${
+                           r.status === 'EXECUTED' ? 'bg-emerald-500/10 text-emerald-400' :
+                           r.status === 'PENDING' ? 'bg-amber-500/10 text-amber-400' :
+                           'bg-red-500/10 text-red-400'
+                         }`}>
+                           {r.status}
+                         </span>
+                      </div>
+                      <p className="mt-1 text-xl font-black text-white">{formatInr(Number(r.amount))}</p>
+                      <p className="text-[10px] font-medium text-slate-500 mt-0.5">
+                        {new Date(r.created_at).toLocaleDateString()} at {new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {r.execution_tx_id && <span className="ml-2 font-mono opacity-60">· ledger_tx_{r.execution_tx_id.slice(0,8)}</span>}
+                      </p>
                     </div>
                   </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
+
+                  {r.status === 'PENDING' && roleCanCheck(employee.role) ? (
+                    <div className="flex flex-col gap-3 rounded-xl bg-white/5 p-3 md:flex-row md:items-center">
+                      <input
+                        className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 md:w-48"
+                        placeholder="Rejection note..."
+                        value={rejectDrafts[r.id] ?? ''}
+                        onChange={(e) =>
+                          setRejectDrafts((prev) => ({ ...prev, [r.id]: e.target.value }))
+                        }
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={actionLoadingId === r.id}
+                          onClick={() => void onApprove(r.id)}
+                          className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-500 active:scale-95 transition-all md:flex-none"
+                        >
+                          {actionLoadingId === r.id ? 'Settling...' : 'Approve'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionLoadingId === r.id}
+                          onClick={() => void onReject(r.id)}
+                          className="flex-1 rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-2 text-xs font-bold text-red-200 hover:bg-red-900/50 active:scale-95 transition-all md:flex-none"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );

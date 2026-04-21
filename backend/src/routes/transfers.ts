@@ -126,6 +126,7 @@ transfersRouter.post(
     const id = String(req.params.id);
 
     const client = await poolA().connect();
+    let isReleased = false;
     try {
       await client.query('BEGIN');
 
@@ -172,6 +173,8 @@ transfersRouter.post(
       );
 
       await client.query('COMMIT');
+      client.release();
+      isReleased = true;
 
       const exec = await execute2pcTransfer({
         fromAccountId: row.from_account_id,
@@ -197,7 +200,7 @@ transfersRouter.post(
 
       return res.json({ ok: true, transactionId: exec.transactionId });
     } catch (e) {
-      await client.query('ROLLBACK').catch(() => {});
+      if (!isReleased) await client.query('ROLLBACK').catch(() => {});
       try {
         const failRes = await poolA().query(
           `UPDATE transfer_requests
@@ -229,7 +232,7 @@ transfersRouter.post(
 
       return res.status(500).json({ error: 'Approval/execute failed', details: e instanceof Error ? e.message : 'Unknown error' });
     } finally {
-      client.release();
+      if (!isReleased) client.release();
     }
   },
 );
