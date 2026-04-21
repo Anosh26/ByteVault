@@ -10,12 +10,25 @@ function requireEnv(name: string): string {
 }
 
 export function poolA(): Pool {
-  if (!_poolA) _poolA = new Pool({ connectionString: requireEnv('BRANCH_A_DB_URL') });
+  if (!_poolA) {
+    _poolA = new Pool({
+      connectionString: requireEnv('BRANCH_A_DB_URL'),
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    });
+  }
   return _poolA;
 }
 
 export function poolB(): Pool {
-  if (!_poolB) _poolB = new Pool({ connectionString: requireEnv('BRANCH_B_DB_URL') });
+  if (!_poolB) {
+    _poolB = new Pool({
+      connectionString: requireEnv('BRANCH_B_DB_URL'),
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    });
+  }
   return _poolB;
 }
-

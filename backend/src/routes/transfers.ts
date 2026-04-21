@@ -12,7 +12,6 @@ async function resolveAccountByNumber(accountNumber: string): Promise<ResolveRes
   const local = await poolA().query('SELECT id FROM accounts WHERE account_number = $1', [accountNumber]);
   if (local.rows.length > 0) return { accountId: local.rows[0].id as string, branch: 'MAIN' };
 
-  // Main DB imports Sub as fdw_sub.* (must exist for cross-branch resolution).
   const foreign = await poolA().query('SELECT id FROM fdw_sub.accounts WHERE account_number = $1', [
     accountNumber,
   ]);
@@ -38,7 +37,6 @@ async function audit(params: {
   );
 }
 
-// Maker creates a transfer request using account numbers (UI-friendly).
 transfersRouter.post(
   '/requests',
   requireEmployeeAuth,
@@ -73,6 +71,7 @@ transfersRouter.post(
     let insertId, insertStatus, insertCreatedAt;
     try {
       await client.query('BEGIN');
+      await client.query('SELECT 1 FROM accounts WHERE id = $1 FOR UPDATE', [from.accountId]);
       const available = await getAvailableCustomerBalanceCents({ client, accountId: from.accountId });
       if (available.availableCents < amountCents) {
         throw new Error('Insufficient funds');
@@ -117,7 +116,6 @@ transfersRouter.post(
   },
 );
 
-// Checker approves and executes the transfer (2PC).
 transfersRouter.post(
   '/requests/:id/approve',
   requireEmployeeAuth,
@@ -174,7 +172,6 @@ transfersRouter.post(
           return r.accountId;
         })());
 
-      // Execute transfer outside the row lock (2PC itself will lock accounts).
       const exec = await execute2pcTransfer({
         fromAccountId: row.from_account_id,
         toAccountId: toResolved,
@@ -201,12 +198,22 @@ transfersRouter.post(
     } catch (e) {
       await client.query('ROLLBACK').catch(() => {});
       try {
-        await poolA().query(
+        const failRes = await poolA().query(
           `UPDATE transfer_requests
            SET status='FAILED', updated_at=CURRENT_TIMESTAMP
-           WHERE id=$1 AND status IN ('PENDING','APPROVED')`,
+           WHERE id=$1 AND status IN ('PENDING','APPROVED')
+           RETURNING hold_id`,
           [req.params.id],
         );
+        
+        if (failRes.rows.length > 0 && failRes.rows[0].hold_id) {
+          await poolA().query(
+            `UPDATE account_holds
+             SET status='RELEASED', released_at=CURRENT_TIMESTAMP
+             WHERE id=$1 AND status='ACTIVE'`,
+            [failRes.rows[0].hold_id]
+          );
+        }
       } catch {}
 
       try {
@@ -226,7 +233,6 @@ transfersRouter.post(
   },
 );
 
-// Checker rejects.
 transfersRouter.post(
   '/requests/:id/reject',
   requireEmployeeAuth,
@@ -280,7 +286,6 @@ transfersRouter.post(
   },
 );
 
-// List requests (simple).
 transfersRouter.get(
   '/requests',
   requireEmployeeAuth,
@@ -294,4 +299,3 @@ transfersRouter.get(
     return res.json({ requests: q.rows });
   },
 );
-
