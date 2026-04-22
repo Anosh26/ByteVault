@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "bun --watch index.ts",
+    "onboard": "bun scripts/onboard.ts",
     "start": "bun run index.ts"
   },
   "devDependencies": {

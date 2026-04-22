@@ -6,7 +6,6 @@ import { authRouter } from './src/routes/auth.ts';
 import { requireEmployeeAuth, requireEmployeeRole } from './src/middleware/auth.ts';
 import { requireIdempotencyKey } from './src/middleware/idempotency.ts';
 import { transfersRouter } from './src/routes/transfers.ts';
-import { devRouter } from './src/routes/dev.ts';
 import { requestLogger } from './src/middleware/requestLogger.ts';
 import { poolA, poolB } from './src/db.ts';
 import { log } from './src/utils/logger.ts';
@@ -70,7 +69,6 @@ app.get('/health/deep', async (_req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/transfers', transfersRouter);
-app.use('/api/dev', devRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/accounts', accountsRouter);
 app.use('/api/ledger', ledgerRouter);

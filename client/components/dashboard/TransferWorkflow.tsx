@@ -163,7 +163,7 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
         <div className="glass-card p-6 shadow-2xl shadow-blue-500/5">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-blue-500/10 p-2 text-blue-400">
-              <ArrowRightLeft className="h-5 w-5" />
+              <ArrowRightLeft suppressHydrationWarning className="h-5 w-5" />
             </div>
             <h3 className="text-xl font-bold glow-text">Initiate Inter-Branch Transfer</h3>
           </div>
@@ -188,7 +188,7 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
               <div className="min-h-[1.25rem]">
                 {fromBalanceLoading ? (
                   <span className="flex items-center gap-2 text-[10px] text-blue-400/80 animate-pulse">
-                    <Clock className="h-3 w-3" /> Fetching ledger status...
+                    <Clock suppressHydrationWarning className="h-3 w-3" /> Fetching ledger status...
                   </span>
                 ) : fromBalance ? (
                   <div className="flex flex-col gap-0.5 text-[10px]">
@@ -235,7 +235,7 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
               </button>
               {formError && (
                 <div className="flex items-center gap-2 rounded-lg bg-red-500/10 px-4 py-2 text-xs text-red-400 border border-red-500/20">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <AlertCircle suppressHydrationWarning className="h-4 w-4 shrink-0" />
                   {formError}
                 </div>
               )}
@@ -248,7 +248,7 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
         <div className="flex items-center justify-between gap-4 border-b border-white/5 pb-4">
           <div className="flex items-center gap-3">
              <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400">
-               <Clock className="h-5 w-5" />
+               <Clock suppressHydrationWarning className="h-5 w-5" />
              </div>
              <h3 className="text-xl font-bold text-white">Transaction Pipeline</h3>
           </div>
@@ -263,7 +263,7 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
 
         {actionError && (
           <div className="mt-4 flex items-center gap-2 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-400 border border-red-500/20 animate-in fade-in zoom-in duration-300">
-            <XCircle className="h-5 w-5 shrink-0" />
+            <XCircle suppressHydrationWarning className="h-5 w-5 shrink-0" />
             {actionError}
           </div>
         )}
@@ -289,11 +289,11 @@ export default function TransferWorkflow({ employee }: { employee: Employee }) {
                   <div className="flex items-start gap-4">
                     <div className="mt-1">
                       {r.status === 'EXECUTED' ? (
-                        <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                        <CheckCircle2 suppressHydrationWarning className="h-6 w-6 text-emerald-500" />
                       ) : r.status === 'FAILED' || r.status === 'REJECTED' ? (
-                        <XCircle className="h-6 w-6 text-red-500" />
+                        <XCircle suppressHydrationWarning className="h-6 w-6 text-red-500" />
                       ) : (
-                        <Clock className="h-6 w-6 text-amber-500 animate-pulse" />
+                        <Clock suppressHydrationWarning className="h-6 w-6 text-amber-500 animate-pulse" />
                       )}
                     </div>
                     <div>

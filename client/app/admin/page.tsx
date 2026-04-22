@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/axios';
 import { formatInr } from '@/lib/format';
-import { Users, FileText, BarChart3, RotateCcw, Calendar, RefreshCcw } from 'lucide-react';
+import { Users, FileText, BarChart3, RotateCcw, Calendar, RefreshCcw, ArrowRightLeft } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/idempotency';
 
 type UserRow = {
@@ -118,19 +118,19 @@ export default function AdminPage() {
               onClick={() => setTab('users')}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${tab === 'users' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
             >
-              <Users className="h-4 w-4" /> Users
+              <Users suppressHydrationWarning className="h-4 w-4" /> Users
             </button>
             <button
               onClick={() => setTab('journal')}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${tab === 'journal' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
             >
-              <FileText className="h-4 w-4" /> Journal
+              <FileText suppressHydrationWarning className="h-4 w-4" /> Journal
             </button>
             <button
               onClick={() => setTab('recon')}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${tab === 'recon' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
             >
-              <BarChart3 className="h-4 w-4" /> Recon
+              <BarChart3 suppressHydrationWarning className="h-4 w-4" /> Recon
             </button>
           </nav>
         </header>
@@ -145,8 +145,8 @@ export default function AdminPage() {
           {tab === 'users' && (
             <div className="glass-card overflow-hidden">
                <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                 <h3 className="font-bold text-white flex items-center gap-2"><Users className="h-4 w-4 text-blue-400" /> Customer Registry</h3>
-                 <button onClick={() => void loadUsers()} className="text-slate-500 hover:text-blue-400 transition-colors"><RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
+                 <h3 className="font-bold text-white flex items-center gap-2"><Users suppressHydrationWarning className="h-4 w-4 text-blue-400" /> Customer Registry</h3>
+                 <button onClick={() => void loadUsers()} className="text-slate-500 hover:text-blue-400 transition-colors"><RefreshCcw suppressHydrationWarning className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
                </div>
                <div className="overflow-x-auto">
                  <table className="w-full text-left text-sm border-collapse">
@@ -179,8 +179,8 @@ export default function AdminPage() {
           {tab === 'journal' && (
             <div className="glass-card overflow-hidden">
                <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                  <h3 className="font-bold text-white flex items-center gap-2"><FileText className="h-4 w-4 text-purple-400" /> General Ledger Journal</h3>
-                  <button onClick={() => void loadJournal()} className="text-slate-500 hover:text-purple-400 transition-colors"><RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
+                  <h3 className="font-bold text-white flex items-center gap-2"><FileText suppressHydrationWarning className="h-4 w-4 text-purple-400" /> General Ledger Journal</h3>
+                  <button onClick={() => void loadJournal()} className="text-slate-500 hover:text-purple-400 transition-colors"><RefreshCcw suppressHydrationWarning className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
                </div>
                <div className="overflow-x-auto">
                  <table className="w-full text-left text-sm border-collapse">
@@ -216,7 +216,7 @@ export default function AdminPage() {
                                onClick={() => onReverse(e.id)}
                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 transition-all hover:bg-red-500 hover:text-white"
                              >
-                               <RotateCcw className="h-3 w-3" /> Reverse
+                               <RotateCcw suppressHydrationWarning className="h-3 w-3" /> Reverse
                              </button>
                            )}
                            {e.reversal_of_entry_id && (
@@ -235,19 +235,19 @@ export default function AdminPage() {
             <div className="space-y-6">
               <div className="glass-card p-6 flex flex-wrap items-end gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1"><Calendar className="h-3 w-3" /> Start Date</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1"><Calendar suppressHydrationWarning className="h-3 w-3" /> Start Date</label>
                   <input type="date" className="input-field max-w-[200px]" value={startDate} onChange={e => setStartDate(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1"><Calendar className="h-3 w-3" /> End Date</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1"><Calendar suppressHydrationWarning className="h-3 w-3" /> End Date</label>
                   <input type="date" className="input-field max-w-[200px]" value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
-                <button onClick={() => void loadRecon()} className="btn-primary flex items-center gap-2 h-11 px-8"><BarChart3 className="h-4 w-4" /> Run Reconciliation</button>
+                <button onClick={() => void loadRecon()} className="btn-primary flex items-center gap-2 h-11 px-8"><BarChart3 suppressHydrationWarning className="h-4 w-4" /> Run Reconciliation</button>
               </div>
 
               <div className="glass-card overflow-hidden">
                 <div className="p-6 border-b border-white/5 h-16 flex items-center">
-                  <h3 className="font-bold text-white flex items-center gap-2"><ArrowRightLeft className="h-4 w-4 text-emerald-400" /> Internal Account Net Balances</h3>
+                  <h3 className="font-bold text-white flex items-center gap-2"><ArrowRightLeft suppressHydrationWarning className="h-4 w-4 text-emerald-400" /> Internal Account Net Balances</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm border-collapse">

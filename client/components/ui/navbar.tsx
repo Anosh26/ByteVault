@@ -48,7 +48,7 @@ export default function Navbar() {
           className="flex items-center gap-2 group transition-transform active:scale-95"
         >
           <div className="rounded-lg bg-blue-600 p-1.5 shadow-lg shadow-blue-500/20">
-            <Shield className="h-5 w-5 text-white" />
+            <Shield suppressHydrationWarning className="h-5 w-5 text-white" />
           </div>
           <span className="text-xl font-black tracking-tighter text-white">
             BYTE<span className="text-blue-500">VAULT</span>
@@ -57,7 +57,7 @@ export default function Navbar() {
 
         <div className="flex items-center gap-6">
           {!ready ? (
-            <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+            <Loader2 suppressHydrationWarning className="h-4 w-4 animate-spin text-slate-500" />
           ) : isLoggedIn ? (
             <>
               <div className="hidden lg:flex flex-col items-end gap-0.5">
@@ -72,7 +72,7 @@ export default function Navbar() {
                   href="/dashboard" 
                   className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${pathname === '/dashboard' ? 'bg-white/5 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
                 >
-                  <LayoutDashboard className="h-4 w-4" />
+                  <LayoutDashboard suppressHydrationWarning className="h-4 w-4" />
                   <span className="hidden sm:inline">Dashboard</span>
                 </Link>
 
@@ -81,7 +81,7 @@ export default function Navbar() {
                     href="/admin" 
                     className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${pathname === '/admin' ? 'bg-red-500/10 text-red-400' : 'text-slate-400 hover:text-red-400 hover:bg-white/5'}`}
                   >
-                    <Settings className="h-4 w-4" />
+                    <Settings suppressHydrationWarning className="h-4 w-4" />
                     <span className="hidden sm:inline">Admin</span>
                   </Link>
                 )}
@@ -91,7 +91,7 @@ export default function Navbar() {
                   onClick={logout}
                   className="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-slate-500 transition-all hover:bg-red-500/10 hover:text-red-400"
                 >
-                  <LogOut className="h-4 w-4" />
+                  <LogOut suppressHydrationWarning className="h-4 w-4" />
                   <span className="hidden sm:inline">Exit</span>
                 </button>
               </div>

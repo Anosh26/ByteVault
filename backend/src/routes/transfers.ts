@@ -5,37 +5,10 @@ import { requireEmployeeAuth, requireEmployeeRole } from '../middleware/auth.ts'
 import { requireIdempotencyKey } from '../middleware/idempotency.ts';
 import { execute2pcTransfer } from '../controllers/transaction.controller.ts';
 import { getAvailableCustomerBalanceCents } from '../ledger/ledger.ts';
-
-type ResolveResult = { accountId: string; branch: 'MAIN' | 'SUB' };
-
-async function resolveAccountByNumber(accountNumber: string): Promise<ResolveResult | null> {
-  const local = await poolA().query('SELECT id FROM accounts WHERE account_number = $1', [accountNumber]);
-  if (local.rows.length > 0) return { accountId: local.rows[0].id as string, branch: 'MAIN' };
-
-  const foreign = await poolA().query('SELECT id FROM fdw_sub.accounts WHERE account_number = $1', [
-    accountNumber,
-  ]);
-  if (foreign.rows.length > 0) return { accountId: foreign.rows[0].id as string, branch: 'SUB' };
-
-  return null;
-}
+import { AccountService } from '../services/AccountService.ts';
+import { AuditService } from '../services/AuditService.ts';
 
 export const transfersRouter = express.Router();
-
-async function audit(params: {
-  actorEmployeeId: string;
-  action: string;
-  entityType: string;
-  entityId?: string | null;
-  meta?: unknown;
-}) {
-  const { actorEmployeeId, action, entityType, entityId, meta } = params;
-  await poolA().query(
-    `INSERT INTO audit_logs (actor_type, actor_id, action, entity_type, entity_id, meta)
-     VALUES ('EMPLOYEE', $1, $2, $3, $4, $5)`,
-    [actorEmployeeId, action, entityType, entityId ?? null, meta ?? null],
-  );
-}
 
 transfersRouter.post(
   '/requests',
@@ -54,8 +27,8 @@ transfersRouter.post(
       return res.status(400).json({ error: 'Valid fromAccountNumber, toAccountNumber, amount (string) required' });
     }
 
-    const from = await resolveAccountByNumber(fromAccountNumber);
-    const to = await resolveAccountByNumber(toAccountNumber);
+    const from = await AccountService.resolveByNumber(fromAccountNumber);
+    const to = await AccountService.resolveByNumber(toAccountNumber);
     if (!from) return res.status(404).json({ error: 'from account not found' });
     if (!to) return res.status(404).json({ error: 'to account not found' });
 
@@ -104,8 +77,8 @@ transfersRouter.post(
       client.release();
     }
 
-    await audit({
-      actorEmployeeId: emp.id,
+    await AuditService.log({
+      actorId: emp.id,
       action: 'TRANSFER_REQUEST_CREATED',
       entityType: 'transfer_request',
       entityId: insertId,
@@ -160,9 +133,9 @@ transfersRouter.post(
       const toResolved =
         row.to_account_id ??
         (await (async () => {
-          const r = await resolveAccountByNumber(row.to_account_number);
+          const r = await AccountService.resolveByNumber(row.to_account_number);
           if (!r || r.branch !== 'SUB') throw new Error('to account not found in SUB at approval time');
-          return r.accountId;
+          return r.id;
         })());
 
       await client.query(
@@ -190,8 +163,8 @@ transfersRouter.post(
         [emp.id, exec.transactionId, row.id],
       );
 
-      await audit({
-        actorEmployeeId: emp.id,
+      await AuditService.log({
+        actorId: emp.id,
         action: 'TRANSFER_REQUEST_APPROVED_EXECUTED',
         entityType: 'transfer_request',
         entityId: row.id,
@@ -221,8 +194,8 @@ transfersRouter.post(
       } catch {}
 
       try {
-        await audit({
-          actorEmployeeId: emp.id,
+        await AuditService.log({
+          actorId: emp.id,
           action: 'TRANSFER_REQUEST_APPROVE_FAILED',
           entityType: 'transfer_request',
           entityId: id,
@@ -278,8 +251,8 @@ transfersRouter.post(
       client.release();
     }
 
-    await audit({
-      actorEmployeeId: emp.id,
+    await AuditService.log({
+      actorId: emp.id,
       action: 'TRANSFER_REQUEST_REJECTED',
       entityType: 'transfer_request',
       entityId: q.rows[0].id,

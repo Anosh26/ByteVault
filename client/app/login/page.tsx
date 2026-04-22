@@ -42,7 +42,7 @@ export default function LoginPage() {
           
           <div className="flex flex-col items-center">
             <div className="flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-xl shadow-blue-500/20 mb-6 group cursor-default">
-              <Shield className="h-8 w-8 text-white transition-transform group-hover:scale-110" />
+              <Shield suppressHydrationWarning className="h-8 w-8 text-white transition-transform group-hover:scale-110" />
             </div>
             <h2 className="text-3xl font-black glow-text tracking-tight">Access ByteVault</h2>
             <p className="mt-2 text-sm text-slate-500 font-medium">Enterprise Distributed Ledger System</p>
@@ -53,7 +53,7 @@ export default function LoginPage() {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 ml-1">Work Email</label>
                 <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 transition-colors group-focus-within:text-blue-400" />
+                  <Mail suppressHydrationWarning className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 transition-colors group-focus-within:text-blue-400" />
                   <input 
                     type="email" 
                     className="input-field pl-11"
@@ -69,7 +69,7 @@ export default function LoginPage() {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 ml-1">Password</label>
                 <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 transition-colors group-focus-within:text-blue-400" />
+                  <Lock suppressHydrationWarning className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 transition-colors group-focus-within:text-blue-400" />
                   <input 
                     type="password" 
                     className="input-field pl-11"
@@ -98,7 +98,7 @@ export default function LoginPage() {
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4 text-blue-200 transition-transform group-hover:rotate-12" />
+                  <Sparkles suppressHydrationWarning className="h-4 w-4 text-blue-200 transition-transform group-hover:rotate-12" />
                   Authenticate Securely
                 </>
               )}
@@ -111,7 +111,7 @@ export default function LoginPage() {
                <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">System Ready</span>
             </div>
             <div className="flex flex-col items-center gap-1.5 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all cursor-help">
-               <Shield className="h-3 w-3 text-blue-500" />
+               <Shield suppressHydrationWarning className="h-3 w-3 text-blue-500" />
                <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">2PC Enforced</span>
             </div>
           </div>
