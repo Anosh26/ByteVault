@@ -1,34 +1,62 @@
-\section{Databases}
-\subsection{Containers}
-Two Postgres containers are used:
-\begin{itemize}[nosep]
-  \item \textbf{Main DB}: \texttt{branch\_a\_db} (container \texttt{bytevault\_branch\_a})
-  \item \textbf{Sub DB}: \texttt{branch\_b\_db} (container \texttt{bytevault\_branch\_b})
+\section{Database Architecture}
+
+ByteVault relies on a distributed PostgreSQL architecture designed to simulate a multi-branch banking environment. This architecture enforces strict separation of data at the storage level while allowing secure, atomic cross-branch transactions.
+
+\subsection{Multi-Container Setup}
+The system utilizes two distinct PostgreSQL instances, defined in \texttt{docker-compose.yml}:
+\begin{itemize}
+  \item \textbf{Main DB (Panji Branch)}: \texttt{branch\_a\_db} listening on internal port 5432 (mapped to 55432).
+  \item \textbf{Sub DB (Mapusa Branch)}: \texttt{branch\_b\_db} listening on internal port 5432 (mapped to 55433).
 \end{itemize}
 
-\subsection{FDW}
-Main imports a subset of Sub tables into schema \texttt{fdw\_sub}:
-\begin{itemize}[nosep]
-  \item \texttt{branches}, \texttt{users}, \texttt{employees}, \texttt{accounts}, \texttt{transactions}, \texttt{external\_transfers}
-\end{itemize}
+\textbf{Why it is there:} This multi-database setup models real-world core banking systems where regional branches might operate on physically separate infrastructure to ensure data sovereignty and reduce blast radius during failures.
 
-This enables Main to resolve Sub entities without direct Sub DB access from the client.
+\subsection{PostgreSQL Foreign Data Wrapper (FDW)}
+To facilitate cross-branch operations without the backend needing to manually coordinate dual database connections for simple queries, ByteVault uses \texttt{postgres\_fdw}. 
 
-\subsection{2PC}
-Cross-branch settlement uses Postgres prepared transactions:
-\begin{itemize}[nosep]
-  \item \texttt{PREPARE TRANSACTION}
-  \item \texttt{COMMIT PREPARED} / \texttt{ROLLBACK PREPARED}
-\end{itemize}
+The Main DB (Panji) mounts a subset of the Sub DB (Mapusa) tables into a specialized schema named \texttt{fdw\_sub}.
 
-\textbf{Important:} Postgres must have \texttt{max\_prepared\_transactions > 0}. This is configured in \texttt{docker/custom.conf}.
+\begin{lstlisting}[style=sql]
+-- Snippet from docker/init.sql
+CREATE SERVER IF NOT EXISTS sub_branch
+  FOREIGN DATA WRAPPER postgres_fdw
+  OPTIONS (host 'branch_b_db', port '5432', dbname 'branch_b_db');
 
-\subsection{Core schema (high-level)}
-The schema includes:
-\begin{itemize}[nosep]
-  \item Operational tables: \texttt{branches}, \texttt{users}, \texttt{employees}, \texttt{accounts}
-  \item Transfer workflow: \texttt{transfer\_requests} (maker/checker)
-  \item Idempotency: \texttt{idempotency\_keys}
-  \item Auditing: \texttt{audit\_logs}
-  \item Ledger (double-entry): \texttt{ledger\_accounts}, \texttt{journal\_entries}, \texttt{journal\_lines}
+CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER SERVER sub_branch
+  OPTIONS (user 'admin_b', password 'secure_password_b');
+
+IMPORT FOREIGN SCHEMA public
+  LIMIT TO (branches, users, employees, accounts)
+  FROM SERVER sub_branch INTO fdw_sub;
+\end{lstlisting}
+
+\textbf{Why it is there:} When a user in the Main branch initiates a transfer to the Sub branch, the backend can effortlessly validate the destination account by querying \texttt{SELECT id FROM fdw\_sub.accounts WHERE account\_number = \$1}. This abstracts the network boundary at the database layer.
+
+\subsection{Two-Phase Commit (2PC)}
+Cross-branch financial transfers cannot be handled by standard local transactions. If the Main DB deducts funds, but the Sub DB crashes before crediting them, money is destroyed. 
+
+To solve this, ByteVault uses PostgreSQL's Distributed Two-Phase Commit protocol.
+
+\begin{lstlisting}[style=bash]
+# PostgreSQL Configuration (docker/custom.conf)
+max_prepared_transactions = 100
+\end{lstlisting}
+
+The 2PC workflow ensures Atomicity across network boundaries:
+\begin{enumerate}
+    \item \textbf{Prepare Phase}: The backend instructs both Main and Sub databases to \texttt{PREPARE TRANSACTION 'tx-uuid'}. Both databases lock the required rows and write the pending transaction to disk, promising they *can* commit.
+    \item \textbf{Commit Phase}: If both respond successfully, the backend issues \texttt{COMMIT PREPARED 'tx-uuid'} to both.
+    \item \textbf{Rollback Phase}: If either DB fails during the Prepare phase, the backend issues \texttt{ROLLBACK PREPARED} to cancel the operation universally.
+\end{enumerate}
+
+\textbf{Why it is there:} 2PC guarantees that distributed systems achieve consensus. A transaction is either 100\% committed on both branches, or 0\% committed, eliminating the risk of partial funds transfer.
+
+\subsection{Schema Design}
+The relational schema is highly normalized:
+\begin{itemize}
+    \item \textbf{Identity}: \texttt{users} (Customers) and \texttt{employees} (Staff).
+    \item \textbf{Security}: \texttt{employee\_credentials} (Isolates password hashes from public profile data).
+    \item \textbf{Core Banking}: \texttt{accounts} and \texttt{account\_holds} (For temporarily reserving funds during pending transfers).
+    \item \textbf{Workflow}: \texttt{transfer\_requests} (Maker/Checker approval pipelines).
+    \item \textbf{Double-Entry Ledger}: \texttt{journal\_entries} and \texttt{journal\_lines}.
 \end{itemize}

@@ -1,0 +1,58 @@
+\section{Security \& Employee Onboarding}
+
+ByteVault implements robust, enterprise-grade security mechanisms to protect sensitive banking operations and customer data. This section details the authentication flows, Role-Based Access Control (RBAC), and safe credential management.
+
+\subsection{Password Hashing \& Storage}
+The system strictly prohibits the storage of plain-text passwords. All credentials, both for customers and employees, are hashed using \textbf{bcrypt} with a cost factor of 12.
+
+\begin{lstlisting}[style=typescript]
+// Snippet from backend/src/utils/password.ts
+export async function hashPassword(password: string): Promise<string> {
+  return await Bun.password.hash(password, {
+    algorithm: 'bcrypt',
+    cost: 12,
+  });
+}
+\end{lstlisting}
+
+\textbf{Why it is there:} Bcrypt is designed to be computationally expensive (slow). By setting a high cost factor, the system inherently defends against brute-force and rainbow-table attacks. Even if the database is compromised, attackers cannot easily reverse the hashes to discover user passwords.
+
+\subsection{Credential Isolation in Schema}
+Identity metadata (names, emails, roles) is stored in the \texttt{employees} table, but the sensitive password hashes are stored in a completely separate \texttt{employee\_credentials} table.
+
+\textbf{Why it is there:} This separation of concerns prevents accidental exposure of password hashes via generic `SELECT * FROM employees` queries that might be used for UI rendering or reporting.
+
+\subsection{Secure CLI Onboarding}
+Initially, the system relied on a fragile runtime environment check (\texttt{dev.ts}) to bootstrap admin accounts, which posed a severe vulnerability if deployed incorrectly. This was replaced by a \textbf{Strictly Modular CLI Tool}.
+
+\begin{lstlisting}[style=bash]
+# Secure bootstrapping of an Admin account directly via terminal
+bun scripts/onboard.ts --email admin@bytevault.com --password "SecurePass123!" --role ADMIN --branch MAIN --name "System Admin"
+\end{lstlisting}
+
+\begin{lstlisting}[style=typescript]
+// Snippet from backend/scripts/onboard.ts
+const passwordHash = await hashPassword(password);
+await poolA().query(
+  `INSERT INTO employee_credentials (employee_id, password_hash)
+   VALUES ($1, $2)`,
+  [employeeId, passwordHash]
+);
+\end{lstlisting}
+
+\textbf{Why it is there:} Administrative bootstrapping must happen outside the public HTTP API. By moving onboarding to a CLI script that interacts directly with the database, we completely eliminate the network attack surface for account creation. This CLI is designed to be executed securely during Docker container initialization or via CI/CD pipelines.
+
+\subsection{Role-Based Access Control (RBAC)}
+Endpoints are protected by precise RBAC policies enforced by Express middleware. The available roles are \texttt{MAKER}, \texttt{CHECKER}, \texttt{MANAGER}, and \texttt{ADMIN}.
+
+\begin{lstlisting}[style=typescript]
+// Snippet from backend/src/routes/transfers.ts
+transfersRouter.post(
+  '/requests/:id/approve',
+  requireEmployeeAuth,
+  requireEmployeeRole('CHECKER', 'MANAGER', 'ADMIN'), // MAKER cannot approve
+  // ... handler logic
+);
+\end{lstlisting}
+
+\textbf{Why it is there:} Financial institutions require strict Separation of Duties. The maker-checker paradigm ensures that the employee who initiates a transaction (\texttt{MAKER}) cannot be the same employee who approves and executes it (\texttt{CHECKER}), drastically reducing the risk of internal fraud.

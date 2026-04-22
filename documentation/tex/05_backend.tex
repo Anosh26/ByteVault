@@ -1,88 +1,69 @@
-\section{Backend (Bun + Express)}
-\subsection{Runtime configuration}
-Backend reads environment variables from \texttt{backend/.env}. Example:
-\begin{lstlisting}[style=bash]
-PORT=4000
-BRANCH_A_DB_URL=postgresql://admin_a:secure_password_a@localhost:55432/branch_a_db
-BRANCH_B_DB_URL=postgresql://admin_b:secure_password_b@localhost:55433/branch_b_db
-JWT_SECRET=change_me_to_a_long_random_string
-JWT_ISSUER=bytevault
-JWT_AUDIENCE=bytevault-client
+\section{Backend Architecture}
+
+The backend of ByteVault is a high-performance HTTP API built with \textbf{Bun} and \textbf{Express}. It utilizes TypeScript for type safety and \texttt{zod} for strict runtime schema validation.
+
+\subsection{Architectural Pattern}
+The application recently transitioned from a tightly-coupled Router-Controller model to a \textbf{Layered Service Architecture}. This isolates business logic, database queries, and HTTP transport layers.
+
+\begin{itemize}
+    \item \textbf{Routes}: Define HTTP endpoints and apply middleware.
+    \item \textbf{Middleware}: Handle cross-cutting concerns like Auth (\texttt{requireEmployeeAuth}) and Idempotency.
+    \item \textbf{Services}: Encapsulate reusable business logic (e.g., \texttt{AccountService}, \texttt{AuditService}, \texttt{LedgerService}).
+\end{itemize}
+
+\textbf{Why it is there:} A layered architecture prevents catastrophic failures. For instance, if the Audit log database insert fails, the \texttt{AuditService} gracefully logs to `stderr` without crashing the core financial transaction. 
+
+\subsection{Fault Tolerance \& Circuit Breakers}
+Distributed systems face partial failures. ByteVault implements explicit timeouts when querying remote resources (like the Sub Branch via FDW).
+
+\begin{lstlisting}[style=typescript]
+// Snippet from backend/src/services/AccountService.ts
+const foreign = await poolA().query(
+  'SET statement_timeout = 2000; SELECT id FROM fdw_sub.accounts WHERE account_number = $1',
+  [accountNumber]
+);
 \end{lstlisting}
 
-\subsection{Logging and debugging}
-Every request logs:
-\begin{itemize}[nosep]
-  \item request start/end
-  \item correlation id \texttt{x-request-id}
-  \item method, path, status, latency (ms)
-  \item employee id/role (when authenticated)
+\textbf{Why it is there:} If the \texttt{branch\_b\_db} container crashes, the FDW connection would normally hang indefinitely, consuming connection pool slots and eventually bringing down the Main API. The 2-second \texttt{statement\_timeout} acts as a Circuit Breaker, failing fast and keeping the system responsive.
+
+\subsection{Centralized Error Handling}
+To standardize API responses and prevent raw stack traces from leaking to the client, ByteVault uses a custom \texttt{AppError} utility.
+
+\begin{lstlisting}[style=typescript]
+// Snippet from backend/src/utils/errors.ts
+export class AppError extends Error {
+  constructor(public message: string, public status: number = 400) {
+    super(message);
+  }
+  static notFound(msg: string) { return new AppError(msg, 404); }
+}
+\end{lstlisting}
+
+The global Express error handler catches these and shapes them into predictable JSON structures: \texttt{\{ "error": "Message" \}}.
+
+\subsection{Idempotency Keys}
+All state-mutating payment and ledger routes require an \texttt{Idempotency-Key} HTTP header. 
+
+\textbf{Why it is there:} If a client's network drops \textit{after} the server processes a transfer, the client might retry. Without idempotency, this results in a double-charge.
+
+The middleware calculates a hash of the request payload and checks the \texttt{idempotency\_keys} table. 
+\begin{itemize}
+    \item \textbf{New Request}: Marks status \texttt{IN\_PROGRESS}.
+    \item \textbf{Concurrent Request}: Blocks with 409 Conflict.
+    \item \textbf{Retry}: Returns the cached \texttt{response\_body} immediately.
 \end{itemize}
 
-\subsection{Health endpoints}
-\begin{itemize}[nosep]
-  \item \texttt{GET /health}: basic liveness
-  \item \texttt{GET /health/deep}: DB A, DB B, FDW presence, 2PC readiness
-\end{itemize}
+\subsection{Security \& Authentication}
+ByteVault uses Stateless JWT (JSON Web Tokens) for employee authentication. 
 
-\subsection{Authentication and RBAC}
-\begin{itemize}[nosep]
-  \item Employee login issues JWT access tokens.
-  \item RBAC roles: \texttt{MAKER}, \texttt{CHECKER}, \texttt{MANAGER}, \texttt{ADMIN}
-  \item Authorization is enforced server-side using middleware.
-\end{itemize}
+\begin{lstlisting}[style=typescript]
+export type JwtEmployeeClaims = {
+  sub: string;
+  email: string;
+  role: EmployeeRole;
+  branchId: string | null;
+  branchName: string | null;
+};
+\end{lstlisting}
 
-\subsection{Idempotency}
-Payment/transfer routes require an \texttt{Idempotency-Key} header. The backend:
-\begin{itemize}[nosep]
-  \item stores request hash and response snapshot
-  \item returns prior response on repeated requests (same key, same body)
-  \item marks failures as \texttt{FAILED} to avoid stuck \texttt{IN\_PROGRESS}
-\end{itemize}
-
-\subsection{Current API surface (summary)}
-\paragraph{Auth}
-\begin{itemize}[nosep]
-  \item \texttt{POST /api/auth/employee/login}
-  \item \texttt{GET /api/auth/me}
-\end{itemize}
-
-\paragraph{Users}
-\begin{itemize}[nosep]
-  \item \texttt{POST /api/users}
-  \item \texttt{GET /api/users?limit=\dots\&offset=\dots}
-  \item \texttt{GET /api/users/:id}
-\end{itemize}
-
-\paragraph{Accounts}
-\begin{itemize}[nosep]
-  \item \texttt{POST /api/accounts}
-  \item \texttt{GET /api/accounts?limit=\dots\&offset=\dots}
-  \item \texttt{GET /api/accounts/:id}
-  \item \texttt{GET /api/accounts/by-number/:accountNumber}
-\end{itemize}
-
-\paragraph{Transfers (Maker/Checker)}
-\begin{itemize}[nosep]
-  \item \texttt{POST /api/transfers/requests} (Maker)
-  \item \texttt{POST /api/transfers/requests/:id/approve} (Checker; executes 2PC)
-  \item \texttt{POST /api/transfers/requests/:id/reject} (Checker)
-  \item \texttt{GET /api/transfers/requests}
-\end{itemize}
-
-\paragraph{Ledger (Admin only for now)}
-\begin{itemize}[nosep]
-  \item \texttt{POST /api/ledger/entries}
-  \item \texttt{GET /api/ledger/entries/:id}
-  \item \texttt{POST /api/ledger/entries/:id/reverse} (requires \texttt{reason}, idempotency key; 409 on double-reversal)
-  \item \texttt{GET /api/ledger/customer-accounts/:bankAccountId/balance} (\texttt{ledger.balanceCents}, \texttt{holds.heldCents}, \texttt{holds.availableCents}, cached + delta)
-  \item \texttt{POST /api/ledger/customer-accounts/:bankAccountId/sync-to-cached} (Admin)
-  \item \texttt{GET /api/ledger/reconciliation/report?start\_date=\dots\&end\_date=\dots} (INTERNAL account net balances)
-\end{itemize}
-
-\paragraph{Holds / authorizations (Admin-only for now)}
-\begin{itemize}[nosep]
-  \item \texttt{POST /api/holds} (create hold)
-  \item \texttt{POST /api/holds/:id/release} (release or capture)
-  \item \texttt{GET /api/holds/by-account/:accountId?status=ACTIVE} (list)
-\end{itemize}
+\textbf{Why it is there:} Stateless JWTs eliminate the need for server-side session stores, improving scalability. The JWT explicitly embeds the \texttt{branchName} and \texttt{role} (e.g., MAKER, ADMIN) so the frontend can quickly render UI elements without additional API calls.
