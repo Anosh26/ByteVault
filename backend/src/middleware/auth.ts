@@ -6,6 +6,7 @@ export type AuthedEmployee = {
   email: string;
   role: EmployeeRole;
   branchId: string | null;
+  branchName: string | null;
 };
 
 declare global {
@@ -35,6 +36,7 @@ export function requireEmployeeAuth(req: Request, res: Response, next: NextFunct
       email: claims.email,
       role: claims.role,
       branchId: claims.branchId,
+      branchName: claims.branchName,
     };
     return next();
   } catch {

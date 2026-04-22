@@ -7,6 +7,7 @@ export type JwtEmployeeClaims = {
   email: string;
   role: EmployeeRole;
   branchId: string | null;
+  branchName: string | null;
 };
 
 const issuer = process.env.JWT_ISSUER || 'bytevault';

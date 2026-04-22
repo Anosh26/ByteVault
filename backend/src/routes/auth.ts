@@ -12,9 +12,10 @@ authRouter.post('/employee/login', async (req: Request, res: Response) => {
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
 
   const q = await poolA().query(
-    `SELECT e.id, e.email, e.role, e.branch_id, c.password_hash
+    `SELECT e.id, e.email, e.role, e.branch_id, b.name as branch_name, c.password_hash
      FROM employees e
      JOIN employee_credentials c ON c.employee_id = e.id
+     LEFT JOIN branches b ON b.id = e.branch_id
      WHERE e.email = $1`,
     [email],
   );
@@ -25,6 +26,7 @@ authRouter.post('/employee/login', async (req: Request, res: Response) => {
     email: string;
     role: 'MAKER' | 'CHECKER' | 'MANAGER' | 'ADMIN';
     branch_id: string | null;
+    branch_name: string | null;
     password_hash: string;
   };
 
@@ -36,12 +38,13 @@ authRouter.post('/employee/login', async (req: Request, res: Response) => {
     email: row.email,
     role: row.role,
     branchId: row.branch_id,
+    branchName: row.branch_name,
   });
 
   return res.json({
     accessToken: token,
     tokenType: 'Bearer',
-    employee: { id: row.id, email: row.email, role: row.role, branchId: row.branch_id },
+    employee: { id: row.id, email: row.email, role: row.role, branchId: row.branch_id, branchName: row.branch_name },
   });
 });
 

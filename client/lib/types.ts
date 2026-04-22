@@ -5,6 +5,7 @@ export type Employee = {
   email: string;
   role: EmployeeRole;
   branchId: string | null;
+  branchName: string | null;
 };
 
 export type AccountRow = {

@@ -79,7 +79,7 @@ export default function DashboardPage() {
             {employee.branchId ? (
               <>
                 {' '}
-                · Branch: <span className="font-mono text-slate-300">{employee.branchId}</span>
+                · Branch: <span className="font-bold text-slate-200">{employee.branchName || employee.branchId}</span>
               </>
             ) : null}
           </p>
