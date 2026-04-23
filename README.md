@@ -22,6 +22,25 @@ docker compose up -d
 docker compose ps
 ```
 
+### ⚡ Quick Start (Run Both Servers)
+
+To start the databases, check environment variables, and launch both the Backend and Client in a single terminal:
+
+**Windows (PowerShell):**
+```powershell
+./scripts/dev.ps1
+```
+
+**Linux / Mac / Git Bash:**
+```bash
+./scripts/dev.sh
+```
+
+Alternatively, if you have `npm` or `bun` in the root:
+```bash
+npm run dev
+```
+
 ### If you need a clean DB (WIPES ALL DB DATA)
 
 ```bash

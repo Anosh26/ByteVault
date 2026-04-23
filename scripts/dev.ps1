@@ -3,18 +3,29 @@ $ErrorActionPreference = "Stop"
 $RootDir = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RootDir
 
-Write-Host "Starting databases..."
-docker compose up -d | Out-Host
+Write-Host "--- ByteVault Dev Runner ---" -ForegroundColor Cyan
 
-Write-Host "Applying FDW (Main -> Sub) if needed..."
-try {
-  docker compose exec -T branch_a_db psql -U admin_a -d branch_a_db < docker/apply-fdw-main.sql | Out-Null
-} catch {
-  # ignore (e.g. transient startup timing); you can run it manually after compose is healthy
+# 1. Start Databases
+Write-Host "[1/3] Starting databases..." -ForegroundColor Yellow
+docker compose up -d
+
+# 2. Check Envs
+Write-Host "[2/3] Checking environment files..." -ForegroundColor Yellow
+if (-not (Test-Path "backend/.env")) {
+    Write-Host "  Copying backend/.env.example -> .env"
+    Copy-Item "backend/.env.example" "backend/.env"
+}
+if (-not (Test-Path "client/.env.local")) {
+    Write-Host "  Copying client/.env.example -> .env.local"
+    Copy-Item "client/.env.example" "client/.env.local"
 }
 
-Write-Host ""
-Write-Host "Next steps:"
-Write-Host "  Backend:  cd backend; copy .env.example .env; bun install; bun run dev"
-Write-Host "  Client:   cd client; copy .env.example .env.local; npm install; npm run dev"
+# 3. Run Servers
+Write-Host "[3/3] Launching Backend & Client servers..." -ForegroundColor Yellow
+Write-Host "Press Ctrl+C to stop all processes." -ForegroundColor Gray
 
+npx concurrently `
+  --names "BACKEND,CLIENT" `
+  --prefix-colors "blue,magenta" `
+  "cd backend && bun run dev" `
+  "cd client && npm run dev"

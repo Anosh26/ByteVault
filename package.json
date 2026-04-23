@@ -1,0 +1,13 @@
+{
+  "name": "bytevault-root",
+  "private": true,
+  "scripts": {
+    "dev": "powershell ./scripts/dev.ps1",
+    "dev:sh": "./scripts/dev.sh",
+    "db": "docker compose up -d",
+    "seed": "cd backend && bun run seed-demo"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
