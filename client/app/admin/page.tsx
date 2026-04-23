@@ -48,6 +48,10 @@ export default function AdminPage() {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   // Recon data
   const [reconReport, setReconReport] = useState<ReconResult[]>([]);
+
+  // Add User Form State
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUser, setNewUser] = useState({ fullName: '', email: '', phone: '', password: '' });
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -138,6 +142,21 @@ export default function AdminPage() {
     }
   }
 
+  async function handleAddUser(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.post('/api/users', newUser);
+      setShowAddUser(false);
+      setNewUser({ fullName: '', email: '', phone: '', password: '' });
+      void loadUsers();
+    } catch (e: any) {
+      alert(e.response?.data?.error || 'Failed to create user');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#020617] flex">
       {/* Admin Sidebar */}
@@ -185,8 +204,18 @@ export default function AdminPage() {
           {tab === 'users' && (
             <div className="glass-card overflow-hidden">
                <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                 <h3 className="font-bold text-white flex items-center gap-2"><Users suppressHydrationWarning className="h-4 w-4 text-blue-400" /> Customer Registry</h3>
-                 <button onClick={() => void loadUsers()} className="text-slate-500 hover:text-blue-400 transition-colors"><RefreshCcw suppressHydrationWarning className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
+                  <h3 className="font-bold text-white flex items-center gap-2"><Users suppressHydrationWarning className="h-4 w-4 text-blue-400" /> Customer Registry</h3>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setShowAddUser(true)}
+                      className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"
+                    >
+                      <Users className="w-3 h-3" /> Register Customer
+                    </button>
+                    <button onClick={() => void loadUsers()} className="text-slate-500 hover:text-blue-400 transition-colors">
+                      <RefreshCcw suppressHydrationWarning className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
                </div>
                <div className="overflow-x-auto">
                  <table className="w-full text-left text-sm border-collapse">
@@ -242,11 +271,11 @@ export default function AdminPage() {
                        <tr key={e.id} className="hover:bg-white/[0.02] transition-colors group">
                          <td className="px-6 py-4">
                             {e.kind === 'REVERSAL' ? (
-                              <span className="badge bg-red-500/10 text-red-400 border border-red-500/20">REVERSAL</span>
+                               <span className="badge bg-red-500/10 text-red-400 border border-red-500/20">REVERSAL</span>
                             ) : e.reversal_of_entry_id ? (
-                              <span className="badge bg-slate-500/10 text-slate-400 border border-white/5">REVERSED</span>
+                               <span className="badge bg-slate-500/10 text-slate-400 border border-white/5">REVERSED</span>
                             ) : (
-                              <span className="badge bg-blue-500/10 text-blue-400 border border-blue-500/20">{e.kind}</span>
+                               <span className="badge bg-blue-500/10 text-blue-400 border border-blue-500/20">{e.kind}</span>
                             )}
                             <div className="mt-1 font-mono text-[9px] text-slate-600">{e.id}</div>
                          </td>
@@ -281,11 +310,11 @@ export default function AdminPage() {
               <div className="glass-card p-6 flex flex-wrap items-end gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1"><Calendar suppressHydrationWarning className="h-3 w-3" /> Start Date</label>
-                  <input type="date" className="input-field max-w-[200px]" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                  <input type="date" className="input-field max-w-[200px]" value={startDate} onChange={setStartDate} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1"><Calendar suppressHydrationWarning className="h-3 w-3" /> End Date</label>
-                  <input type="date" className="input-field max-w-[200px]" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                  <input type="date" className="input-field max-w-[200px]" value={endDate} onChange={setEndDate} />
                 </div>
                 <button onClick={() => void loadRecon()} className="btn-primary flex items-center gap-2 h-11 px-8"><BarChart3 suppressHydrationWarning className="h-4 w-4" /> Run Reconciliation</button>
               </div>
@@ -413,6 +442,76 @@ export default function AdminPage() {
           )}
         </main>
       </div>
+      {/* Add User Modal */}
+      {showAddUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-card w-full max-max-md p-8 relative animate-in fade-in zoom-in duration-300">
+            <h2 className="text-xl font-bold text-white mb-6">Register New Customer</h2>
+            <form onSubmit={handleAddUser} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newUser.fullName}
+                  onChange={e => setNewUser({ ...newUser, fullName: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="e.g. John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={newUser.email}
+                  onChange={e => setNewUser({ ...newUser, email: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="john@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Phone Number</label>
+                <input
+                  type="text"
+                  required
+                  value={newUser.phone}
+                  onChange={e => setNewUser({ ...newUser, phone: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="+91 ..."
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Password (Optional)</label>
+                <input
+                  type="password"
+                  value={newUser.password}
+                  onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="Leave blank for 'securepass'"
+                />
+              </div>
+              
+              <div className="flex gap-3 mt-8">
+                <button
+                  type="button"
+                  onClick={() => setShowAddUser(false)}
+                  className="flex-1 px-4 py-2.5 border border-white/10 rounded-xl text-slate-400 hover:bg-white/5 transition-all font-bold text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-900/40"
+                >
+                  {loading ? 'Registering...' : 'Register Customer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

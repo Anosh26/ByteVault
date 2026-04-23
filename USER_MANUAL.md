@@ -1,129 +1,71 @@
-# ByteVault User Manual
+# ByteVault Comprehensive Walkthrough (Phase 1)
 
-Welcome to **ByteVault**! This manual provides a comprehensive guide on how to understand, operate, and manage the ByteVault Banking System. The system is built on a distributed double-entry ledger that guarantees auditability, distributed safety (2PC), and concurrency protection.
+Welcome to the ByteVault Banking System. This document serves as a comprehensive manual for the entire application, covering architecture, employee roles, daily operations, fraud management, and batch processing.
 
-## 1. System Overview
-
-ByteVault simulates a multi-branch banking infrastructure using two separate databases (Main and Sub) integrated via PostgreSQL Foreign Data Wrappers (FDW). 
-
-### Key Concepts
-
-*   **Double-Entry Ledger Architecture:** Every financial movement is represented by a balanced journal entry (`sum of debits + credits = 0`). This ensures funds are never "created" or "destroyed" magically, but simply moved between accounts (Customer accounts and Internal accounts like suspense, clearing, or revenue).
-*   **Two-Phase Commit (2PC):** When transferring funds across branches, the system prepares the transaction on both databases and only commits if both are ready. This eliminates the risk of distributed inconsistencies and partial commits.
-*   **Holds & Authorizations:** When a user initiates a transfer, the system calculates the *available balance* (ledger equity minus active holds). If the balance is sufficient, the funds are "held" (status: `ACTIVE`) until the transfer is reviewed. 
-*   **Maker / Checker Workflow:** High-value transactions are subject to strict separation of concerns. A `MAKER` initiates a transfer request, and a `CHECKER` reviews and approves or rejects it.
+*Note: This manual is being generated in phases. This is Phase 1.*
 
 ---
 
-## 2. Authentication & Roles
+## 1. System Architecture Overview
 
-By default, the application categorizes employee access into roles via JWTs. Each role grants specific operational permissions.
+ByteVault is an enterprise-grade distributed ledger system built to simulate a multi-branch banking environment.
 
-*   **MAKER:** Can create transfer requests.
-*   **CHECKER:** Can approve or reject transfer requests. Cannot initiate them.
-*   **MANAGER:** Can perform both Maker and Checker duties.
-*   **ADMIN:** Has full access to the system, including direct ledger modifications, running sync endpoints, generating reconciliation reports, and reverting entries.
-
----
-
-## 3. Using the App: Core Workflows
-
-### A. Initiating a Transfer (Maker)
-1. **Submit Request:** A logged-in `MAKER` navigates to the transfer portal and enters the `From Account Number`, `To Account Number`, and `Amount` (as a decimal string, e.g., "125.50").
-2. **Hold Application:** The backend intercepts the request and calculates the source account's available balance. If sufficient, a hold is placed on the funds preventing double-spending.
-3. **Pending State:** A `transfer_request` is generated with the status `PENDING`.
-
-### B. Reviewing a Transfer (Checker)
-1. **Review:** A logged-in `CHECKER` navigates to the pending transfer queue.
-2. **Approve:** If approved, the system executes the cross-branch Two-Phase Commit protocol. The ledger applies standard templates, deducting from the sender, sending through internal clearing, and crediting the receiver. The hold transitions to `CAPTURED`, and the request becomes `EXECUTED`.
-3. **Reject:** If rejected, the Checker supplies a reason. The hold transitions to `RELEASED`, the funds are returned to the sender's available balance, and the request becomes `REJECTED`.
+### Core Concepts:
+*   **Distributed Ledger (2PC):** The system operates across multiple database instances (e.g., `branch_a_db` for MAIN, `branch_b_db` for SUB). Transactions spanning across branches utilize the Two-Phase Commit (2PC) protocol to ensure ACID compliance.
+*   **Double-Entry Accounting:** Every financial movement is recorded in a `journal_entries` table with corresponding balanced `journal_lines` mapping to `ledger_accounts` (e.g., debits equal credits).
+*   **Idempotency & Auditing:** All critical actions require an `Idempotency-Key` to prevent duplicate processing, and every action is logged into an immutable `audit_logs` table.
 
 ---
 
-## 4. Admin Operations
+## 2. Access & Employee Roles
 
-Administrators have access to powerful ledger reconciliation and auditing tools. 
+The system employs strict Role-Based Access Control (RBAC). Employees authenticate via the `/login` portal, and their JWT token dictates their permissions.
 
-### A. Reversals (Immutable Corrections)
-In an immutable ledger, entries cannot be `DELETED`. If an erroneous entry is posted, an Admin can reverse it:
-*   **Reversing:** Calling `POST /api/ledger/entries/:id/reverse` with a valid string `reason` creates a mirror entry that reverses the debits and credits of the original entry.
-*   **Safety:** The system restricts double-reversals (reversing a reversal) and identical inversions using strict database constraints.
+### The Four Core Roles:
 
-### B. Reconciliation Reporting
-Admins can generate time-boxed reconciliation reports for all internal firm accounts:
-*   **Report Generation:** Calling `GET /api/ledger/reconciliation/report?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` aggregates daily material balances.
-*   **Verification:** An administrator can immediately verify that internal `CLEARING_INTERBRANCH` routing accounts net to zero over closed periods, proving organizational money integrity.
-
-### C. Ledger Syncing
-Since the application supports cached customer balances for ultra-fast reads, Admins can run drift detection tools.
-*   **Sync:** Calling `POST /api/ledger/customer-accounts/:bankAccountId/sync-to-cached` checks for discrepancies between the immutable ledger mathematical truth and the cached cache. If a drift is identified, a sync entry is automatically journaled using an `EQUITY_LEDGER_SYNC` internal account.
-
----
-
-## 5. Compliance & Auditing
-
-ByteVault includes dedicated modules for regulatory compliance and operational transparency.
-
-### A. KYC (Know Your Customer)
-All users in the system are assigned a KYC status which determines their eligibility for banking services.
-*   **PENDING:** Newly created users. They cannot yet open accounts or initiate transfers.
-*   **VERIFIED:** Users who have passed verification. Full access to banking features.
-*   **REJECTED:** Users who failed verification. Their accounts are frozen and cannot receive or send funds.
-
-Employee dashboards display these statuses clearly with color-coded badges to prevent accidental processing of unverified transactions.
-
-### B. System Audit Trail
-For security and troubleshooting, the system maintains a high-fidelity audit trail of all sensitive operations.
-*   **Automatic Logging:** Every account creation, transfer approval, and ledger adjustment is logged into the `audit_logs` table.
-*   **Actor Identification:** Logs include the UUID of the employee or user who performed the action, mapped via `actor_id` and `actor_type`.
-*   **Metadata Inspection:** Detailed context for each action is stored in a `JSONB` column (`meta`). This captures exact transfer amounts, approval notes, limit adjustments, or failure reasons.
-
-Administrators can access the global audit feed at `/admin/audit` to monitor system health and employee performance.
-
-#### Technical Details
-- **API Endpoint:** `GET /api/audit`
-- **Routing:** Mounted at `/api/audit` via the `auditRouter` in `backend/index.ts`.
-- **UI Integration:** The Next.js frontend fetches this data and renders it in the Admin Dashboard. The navigation bar natively includes a deeply integrated "Audit Trail" link (`<LayoutDashboard />` icon) visible exclusively to users with the `ADMIN` role.
-- **Account Data Joining:** When viewing account details (`GET /api/accounts/by-number/:accountNumber`), the backend performs a highly-efficient SQL `JOIN` on the `users` table to fetch the exact `kyc_status` (e.g., `SELECT a.*, u.kyc_status FROM accounts a JOIN users u ON a.user_id = u.id`). This guarantees the KYC status is never dropped from individual account lookups.
-- **TypeScript Integration:** The `AccountRow` interface in `client/lib/types.ts` is explicitly typed to accept flexible strings for `kyc_status?: string;` to ensure UI components never fail to render newly added compliance statuses.
-- **Active Seeding:** The system includes a robust `seed-demo.ts` utility that generates dozens of rows of varying statuses (VERIFIED, REJECTED) and audit events (TRANSFER_APPROVED, KYC_REVIEWED) to ensure testing environments accurately mirror production activity levels.
-
-
-## 6. Idempotency & Safety
-
-All state-altering requests (like creating transfers, approving, or posting ledger entries) require an `Idempotency-Key` header.
-
-*   **Idempotency Keys:** If the exact same request with the same keys reaches the server (e.g. user double-clicked submit, network retry occurred), the server will bypass the business logic entirely and return the exact JSON snapshot of the original consequence.
-*   **Crash Handling:** The system relies on database lock queues and synchronous `UPDATE` commitments. If the Node container unexpectedly crashes mid-approval, all database holds remain intact or automatically unlock if the database severs the connection, ensuring funds are never permanently locked in limbo.
+1.  **MAKER (Initiator)**
+    *   **Purpose:** Data entry and request initiation.
+    *   **Abilities:** Register new users, create new accounts, and *initiate* transfer requests.
+    *   **Restrictions:** Cannot approve transfers, cannot reverse transactions, cannot run batch jobs.
+2.  **CHECKER (Approver)**
+    *   **Purpose:** Oversight and authorization.
+    *   **Abilities:** Review and either *Approve* or *Reject* transfer requests initiated by a Maker.
+    *   **Restrictions:** Cannot create users or initiate transfers themselves. This enforces the "four-eyes principle".
+3.  **MANAGER**
+    *   **Purpose:** Branch management.
+    *   **Abilities:** Combines Maker and Checker abilities, plus basic reporting and auditing views.
+4.  **ADMIN**
+    *   **Purpose:** System oversight and emergency control.
+    *   **Abilities:** Can do everything. Specifically controls Batch Jobs (EOD/EOM), raw Journal Entry posting, Ledger Syncing, and Fraud Reversals.
 
 ---
 
-## 7. Getting Started (Quick Run)
+## 3. Managing Users (Onboarding)
 
-If you haven't spun up the environment, follow these steps from the repository root:
+### How to Add a User
+In a banking environment, customers don't just "sign up" on the public internet. They are onboarded.
 
-1. **Databases:** `docker compose up -d` 
-2. **Apply Migrations:** Run all `.sql` migrations in `/docker` targeting `branch_a_db` and `branch_b_db` to setup FDW, Ledger constraints, and Reversals.
-3. **Backend:** Navigate to `backend/`, copy `.env.example` to `.env`, and execute `bun install && bun run dev`.
-4. **Client:** Navigate to `client/`, copy `.env.example` to `.env.local`, and execute `npm install && npm run dev`. Valid operations can now be done via the client web-app running at `http://localhost:3000`.
-## 5. Administrative Batch Jobs
+**Via the Admin Dashboard (UI):**
+1. Log in as an Admin or Maker.
+2. Navigate to the **Users** tab in the sidebar.
+3. Click **"Register Customer"**.
+4. Fill in the details: Full Name, Email, Phone, and (optional) Password.
+5. Behind the scenes, the system automatically:
+   * Hashes the password securely.
+   * Creates a user record with KYC marked as `PENDING`.
+   * Provisions a default **Savings Account** with a random 5-digit number and ₹0.00 balance at the MAIN branch.
 
-The system includes a **Batch Processing Engine** for handling time-sensitive financial operations. These can be triggered from the **Admin Terminal > Batch Jobs** tab.
+**Via the Onboard Script (CLI):**
+You can also onboard employees via the CLI script:
+```bash
+bun scripts/onboard.ts --email admin@bytevault.com --password securepass --role ADMIN --branch MAIN --name "Super Admin"
+```
 
-### End of Day (EOD) Settlement
-*   **Purpose**: Validates the system's daily health and prepares interest data.
-*   **Operations**:
-    1.  Refreshes the Materialized Views for the ledger.
-    2.  Verifies the `CLEARING_INTERBRANCH` account across all branches. If the branches are out of sync (net balance != 0), the job will abort with a critical error.
-    3.  Calculates daily interest (4% p.a.) for all active accounts and stages them in the `interest_accruals` table.
+### Viewing Users
+The Admin dashboard displays a comprehensive "Customer Registry". It shows:
+*   Name and Contact Info.
+*   Total Balance across all their accounts.
+*   **KYC Status** (`PENDING`, `VERIFIED`, `REJECTED`).
 
-### End of Month (EOM) Interest Posting
-*   **Purpose**: Officially credits customers with their earned interest.
-*   **Operations**:
-    1.  Aggregates all "Pending" accruals for each account.
-    2.  Creates a balanced Journal Entry (Debit Interest Expense / Credit Customer).
-    3.  Updates the live balance of the customer accounts.
-    4.  Marks the accruals as "Posted" to prevent double-charging.
-
-> [!NOTE]
-> All batch jobs are idempotent and utilize **Row-Level Locking (FOR UPDATE)** to ensure that concurrent triggers do not cause data drift or double-posting.
+---
+*End of Phase 1. Let me know when you are ready for Phase 2: KYC & Security Operations (Blocking, Flagging, Unblocking).*

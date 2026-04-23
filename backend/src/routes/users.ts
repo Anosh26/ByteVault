@@ -10,6 +10,7 @@ const createUserSchema = z.object({
   email: z.string().email(),
   phone: z.string().min(3).max(30),
   fullName: z.string().min(2).max(150),
+  password: z.string().min(6).optional(),
 });
 
 usersRouter.post(
@@ -17,15 +18,39 @@ usersRouter.post(
   requireEmployeeAuth,
   requireEmployeeRole('MAKER', 'MANAGER', 'ADMIN'),
   asyncHandler(async (req, res) => {
+    const { hashPassword } = require('../utils/password.ts');
     const body = parseOrThrow(createUserSchema, req.body);
+    const password = body.password || 'securepass'; // Default for demo if not provided
+    const hashedPassword = await hashPassword(password);
 
-    const q = await poolA().query(
-      `INSERT INTO users (email, phone, password_hash, full_name, kyc_status)
-       VALUES ($1, $2, $3, $4, 'PENDING')
-       RETURNING id, email, phone, full_name, kyc_status, created_at`,
-      [body.email, body.phone, 'TEMP', body.fullName],
-    );
-    res.status(201).json({ user: q.rows[0] });
+    const client = await poolA().connect();
+    try {
+      await client.query('BEGIN');
+      
+      const userQ = await client.query(
+        `INSERT INTO users (email, phone, password_hash, full_name, kyc_status)
+         VALUES ($1, $2, $3, $4, 'PENDING')
+         RETURNING id, email, phone, full_name, kyc_status, created_at`,
+        [body.email, body.phone, hashedPassword, body.fullName],
+      );
+      const user = userQ.rows[0];
+
+      // Automatically create a default savings account
+      const account_number = Math.floor(10000 + Math.random() * 90000).toString();
+      await client.query(
+        `INSERT INTO accounts (user_id, branch_id, account_number, balance, status)
+         VALUES ($1, (SELECT id FROM branches WHERE name = 'MAIN' LIMIT 1), $2, 0, 'ACTIVE')`,
+        [user.id, account_number]
+      );
+
+      await client.query('COMMIT');
+      res.status(201).json({ user, initialAccount: account_number });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   }),
 );
 
