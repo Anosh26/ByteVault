@@ -13,9 +13,16 @@ declare global {
   namespace Express {
     interface Request {
       employee?: AuthedEmployee;
+      user?: AuthedCustomer;
     }
   }
 }
+
+export type AuthedCustomer = {
+  id: string;
+  email: string;
+  kycStatus: string;
+};
 
 function parseBearerToken(req: Request): string | null {
   const header = req.header('authorization') || req.header('Authorization');
@@ -51,5 +58,25 @@ export function requireEmployeeRole(...roles: EmployeeRole[]) {
     if (!roles.includes(emp.role)) return res.status(403).json({ error: 'Forbidden' });
     return next();
   };
+}
+
+export function requireCustomerAuth(req: Request, res: Response, next: NextFunction) {
+  try {
+    const token = parseBearerToken(req);
+    if (!token) return res.status(401).json({ error: 'Missing Bearer token' });
+
+    // Assuming we import verifyCustomerToken
+    const { verifyCustomerToken } = require('../auth/jwt.ts');
+    const claims = verifyCustomerToken(token);
+    
+    req.user = {
+      id: claims.sub,
+      email: claims.email,
+      kycStatus: claims.kycStatus,
+    };
+    return next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
 }
 

@@ -40,3 +40,35 @@ export function verifyEmployeeToken(token: string): JwtEmployeeClaims {
   return decoded as JwtEmployeeClaims;
 }
 
+export type JwtCustomerClaims = {
+  sub: string; // user_id UUID
+  email: string;
+  role: 'CUSTOMER';
+  kycStatus: string;
+};
+
+export function signCustomerToken(
+  claims: JwtCustomerClaims,
+  opts?: { expiresIn?: string },
+): string {
+  return jwt.sign(claims, getSecret(), {
+    algorithm: 'HS256',
+    expiresIn: (opts?.expiresIn ?? '2h') as any,
+    issuer,
+    audience,
+  });
+}
+
+export function verifyCustomerToken(token: string): JwtCustomerClaims {
+  const decoded = jwt.verify(token, getSecret(), {
+    algorithms: ['HS256'],
+    issuer,
+    audience,
+  });
+  
+  if ((decoded as any).role !== 'CUSTOMER') {
+    throw new Error('Invalid token role for customer');
+  }
+  return decoded as JwtCustomerClaims;
+}
+
