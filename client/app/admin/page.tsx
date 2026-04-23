@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/axios';
 import { formatInr } from '@/lib/format';
-import { Users, FileText, BarChart3, RotateCcw, Calendar, RefreshCcw, ArrowRightLeft } from 'lucide-react';
+import { Users, FileText, BarChart3, RotateCcw, Calendar, RefreshCcw, ArrowRightLeft, Zap, TrendingUp, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/idempotency';
 
 type UserRow = {
@@ -31,9 +31,14 @@ type ReconResult = {
 };
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<'users' | 'journal' | 'recon'>('users');
+  const [tab, setTab] = useState<'users' | 'journal' | 'recon' | 'batch'>('users');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [eodState, setEodState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [eomState, setEomState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [eodResult, setEodResult] = useState<any>(null);
+  const [eomResult, setEomResult] = useState<any>(null);
 
   // Users data
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -89,6 +94,32 @@ export default function AdminPage() {
     else if (tab === 'recon') void loadRecon();
   }, [tab, loadUsers, loadJournal, loadRecon]);
 
+  async function runEod() {
+    setEodState('loading');
+    setEodResult(null);
+    try {
+      const res = await api.post('/api/admin/jobs/eod-trigger', {});
+      setEodResult(res.data);
+      setEodState('success');
+    } catch (e: any) {
+      setEodResult({ error: e.response?.data?.error || 'EOD failed' });
+      setEodState('error');
+    }
+  }
+
+  async function runEom() {
+    setEomState('loading');
+    setEomResult(null);
+    try {
+      const res = await api.post('/api/admin/jobs/eom-trigger', {});
+      setEomResult(res.data);
+      setEomState('success');
+    } catch (e: any) {
+      setEomResult({ error: e.response?.data?.error || 'EOM failed' });
+      setEomState('error');
+    }
+  }
+
   async function onReverse(entryId: string) {
     const reason = window.prompt('Enter reason for reversal:');
     if (!reason) return;
@@ -131,6 +162,12 @@ export default function AdminPage() {
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${tab === 'recon' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
             >
               <BarChart3 suppressHydrationWarning className="h-4 w-4" /> Recon
+            </button>
+            <button
+              onClick={() => setTab('batch')}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${tab === 'batch' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-amber-400 hover:bg-white/5'}`}
+            >
+              <Zap suppressHydrationWarning className="h-4 w-4" /> Batch Jobs
             </button>
           </nav>
         </header>
@@ -273,6 +310,95 @@ export default function AdminPage() {
                 </div>
                 <div className="p-6 bg-slate-950/50 border-t border-white/5 text-[10px] text-slate-500 leading-relaxed italic">
                   Note: Values representing Internal Clearing accounts should strictly net to ₹0.00 at the end of settled business cycles. Residual balances indicate pending items in the distribution pipeline.
+                </div>
+              </div>
+            </div>
+          )}
+          {tab === 'batch' && (
+            <div className="space-y-6">
+              <div className="glass-card p-8">
+                <div className="flex items-center gap-3 mb-2">
+                  <Zap suppressHydrationWarning className="h-5 w-5 text-amber-400" />
+                  <h3 className="text-lg font-black text-white">Batch Processing Engine</h3>
+                </div>
+                <p className="text-sm text-slate-500 mb-8">Admin-triggered settlement jobs. Each job is wrapped in a database transaction and emits audit logs upon completion. Verify results in the Audit Trail.</p>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="rounded-xl border border-white/5 bg-slate-900/50 p-6 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar suppressHydrationWarning className="h-4 w-4 text-blue-400" />
+                      <span className="text-xs font-bold uppercase tracking-widest text-slate-400">End of Day</span>
+                    </div>
+                    <p className="text-white font-bold text-base">Run EOD Settlement</p>
+                    <p className="text-slate-500 text-xs leading-relaxed">Refreshes materialized views, verifies clearing account nets to zero, audits frozen/suspense accounts, and calculates daily interest accruals (4% p.a.) for all ACTIVE accounts.</p>
+                    <button
+                      id="btn-run-eod"
+                      onClick={() => void runEod()}
+                      disabled={eodState === 'loading'}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20"
+                    >
+                      {eodState === 'loading' ? <RefreshCcw suppressHydrationWarning className="h-4 w-4 animate-spin" /> : <Zap suppressHydrationWarning className="h-4 w-4" />}
+                      {eodState === 'loading' ? 'Running EOD...' : 'Run EOD Settlement'}
+                    </button>
+                    {eodState === 'success' && eodResult && (
+                      <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 space-y-2">
+                        <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                          <CheckCircle2 suppressHydrationWarning className="h-3.5 w-3.5" /> EOD Completed Successfully
+                        </div>
+                        <div className="font-mono text-xs text-slate-400">Accruals staged: <span className="text-white">{eodResult.accrualCount}</span></div>
+                        <div className="font-mono text-xs text-slate-400">Clearing net: <span className="text-white">₹{(eodResult.clearingNetCents / 100).toFixed(2)}</span></div>
+                        <a href="/admin/audit" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors mt-1">
+                          <ExternalLink suppressHydrationWarning className="h-3 w-3" /> Verify in Audit Trail
+                        </a>
+                      </div>
+                    )}
+                    {eodState === 'error' && eodResult && (
+                      <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4">
+                        <div className="flex items-center gap-2 text-red-400 font-bold text-xs mb-1">
+                          <AlertTriangle suppressHydrationWarning className="h-3.5 w-3.5" /> EOD Failed
+                        </div>
+                        <div className="text-xs text-slate-400">{eodResult.error}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-white/5 bg-slate-900/50 p-6 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp suppressHydrationWarning className="h-4 w-4 text-emerald-400" />
+                      <span className="text-xs font-bold uppercase tracking-widest text-slate-400">End of Month</span>
+                    </div>
+                    <p className="text-white font-bold text-base">Run EOM Interest Posting</p>
+                    <p className="text-slate-500 text-xs leading-relaxed">Aggregates all PENDING interest accruals, posts balanced INTEREST_PAYMENT journal entries (Debit: Interest Expense / Credit: Customer), updates cached balances, and marks accruals as POSTED.</p>
+                    <button
+                      id="btn-run-eom"
+                      onClick={() => void runEom()}
+                      disabled={eomState === 'loading'}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
+                    >
+                      {eomState === 'loading' ? <RefreshCcw suppressHydrationWarning className="h-4 w-4 animate-spin" /> : <TrendingUp suppressHydrationWarning className="h-4 w-4" />}
+                      {eomState === 'loading' ? 'Posting Interest...' : 'Run EOM Interest Posting'}
+                    </button>
+                    {eomState === 'success' && eomResult && (
+                      <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4 space-y-2">
+                        <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                          <CheckCircle2 suppressHydrationWarning className="h-3.5 w-3.5" /> EOM Posting Completed
+                        </div>
+                        <div className="font-mono text-xs text-slate-400">Accounts posted: <span className="text-white">{eomResult.postedCount}</span></div>
+                        {eomResult.message && <div className="text-xs text-slate-500 italic">{eomResult.message}</div>}
+                        <a href="/admin/audit" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors mt-1">
+                          <ExternalLink suppressHydrationWarning className="h-3 w-3" /> Verify in Audit Trail
+                        </a>
+                      </div>
+                    )}
+                    {eomState === 'error' && eomResult && (
+                      <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-4">
+                        <div className="flex items-center gap-2 text-red-400 font-bold text-xs mb-1">
+                          <AlertTriangle suppressHydrationWarning className="h-3.5 w-3.5" /> EOM Failed
+                        </div>
+                        <div className="text-xs text-slate-400">{eomResult.error}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
