@@ -74,11 +74,20 @@ Employee dashboards display these statuses clearly with color-coded badges to pr
 
 ### B. System Audit Trail
 For security and troubleshooting, the system maintains a high-fidelity audit trail of all sensitive operations.
-*   **Automatic Logging:** Every account creation, transfer approval, and ledger adjustment is logged.
-*   **Actor Identification:** Logs include the UUID of the employee or user who performed the action.
-*   **Metadata Inspection:** Detailed context for each action is stored in JSON format (e.g., exact transfer amounts, approval notes, or failure reasons).
+*   **Automatic Logging:** Every account creation, transfer approval, and ledger adjustment is logged into the `audit_logs` table.
+*   **Actor Identification:** Logs include the UUID of the employee or user who performed the action, mapped via `actor_id` and `actor_type`.
+*   **Metadata Inspection:** Detailed context for each action is stored in a `JSONB` column (`meta`). This captures exact transfer amounts, approval notes, limit adjustments, or failure reasons.
 
 Administrators can access the global audit feed at `/admin/audit` to monitor system health and employee performance.
+
+#### Technical Details
+- **API Endpoint:** `GET /api/audit`
+- **Routing:** Mounted at `/api/audit` via the `auditRouter` in `backend/index.ts`.
+- **UI Integration:** The Next.js frontend fetches this data and renders it in the Admin Dashboard. The navigation bar natively includes a deeply integrated "Audit Trail" link (`<LayoutDashboard />` icon) visible exclusively to users with the `ADMIN` role.
+- **Account Data Joining:** When viewing account details (`GET /api/accounts/by-number/:accountNumber`), the backend performs a highly-efficient SQL `JOIN` on the `users` table to fetch the exact `kyc_status` (e.g., `SELECT a.*, u.kyc_status FROM accounts a JOIN users u ON a.user_id = u.id`). This guarantees the KYC status is never dropped from individual account lookups.
+- **TypeScript Integration:** The `AccountRow` interface in `client/lib/types.ts` is explicitly typed to accept flexible strings for `kyc_status?: string;` to ensure UI components never fail to render newly added compliance statuses.
+- **Active Seeding:** The system includes a robust `seed-demo.ts` utility that generates dozens of rows of varying statuses (VERIFIED, REJECTED) and audit events (TRANSFER_APPROVED, KYC_REVIEWED) to ensure testing environments accurately mirror production activity levels.
+
 
 ## 6. Idempotency & Safety
 

@@ -39,3 +39,13 @@ Every sensitive action in ByteVault is captured in the \texttt{audit\_logs} tabl
     \item Manual ledger adjustments.
 \end{itemize}
 Admin users can view the full history at \texttt{/admin/audit}, which displays the actor UUID, action type, entity involved, and associated metadata.
+
+\subsubsection{Technical Implementation Details}
+The recent compliance update introduced several system-wide enhancements to support these operational views:
+\begin{itemize}
+    \item \textbf{TypeScript Definitions}: The \texttt{AccountRow} interface in the Next.js client was updated to accept flexible string typings (\texttt{kyc\_status?: string;}) to ensure forward compatibility with new compliance statuses.
+    \item \textbf{SQL Optimization}: The backend endpoint for single-account queries (\texttt{GET /api/accounts/by-number/:accountNumber}) was optimized to perform a \texttt{JOIN} with the \texttt{users} table. This guarantees that \texttt{kyc\_status} is efficiently returned alongside account details without N+1 query problems.
+    \item \textbf{Route Mounting}: A dedicated \texttt{auditRouter} is now mounted at \texttt{/api/audit} to stream the \texttt{audit\_logs} table directly to the frontend.
+    \item \textbf{Navigation Injection}: The employee dashboard navigation bar (\texttt{navbar.tsx}) dynamically injects a \texttt{<LayoutDashboard />} icon linking to the Audit Trail strictly for users authenticated with the \texttt{ADMIN} role.
+    \item \textbf{Seeding Infrastructure}: The development environment features an updated \texttt{seed-demo.ts} script that rapidly provisions verified/rejected users and floods the audit table with diverse events (e.g., \texttt{TRANSFER\_APPROVED}, \texttt{KYC\_REVIEWED}) to properly simulate production volume.
+\end{itemize}
