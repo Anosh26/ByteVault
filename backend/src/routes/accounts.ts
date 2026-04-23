@@ -54,9 +54,10 @@ accountsRouter.get(
   asyncHandler(async (req, res) => {
     const accountNumber = req.params.accountNumber;
     const q = await poolA().query(
-      `SELECT id, user_id, branch_id, account_number, balance, status, created_at, updated_at
-       FROM accounts
-       WHERE account_number = $1`,
+      `SELECT a.id, a.user_id, a.branch_id, a.account_number, a.balance, a.status, a.created_at, a.updated_at, u.kyc_status
+       FROM accounts a
+       JOIN users u ON a.user_id = u.id
+       WHERE a.account_number = $1`,
       [accountNumber],
     );
     if (q.rows.length === 0) return res.status(404).json({ error: 'Account not found' });

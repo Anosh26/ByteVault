@@ -77,13 +77,22 @@ export default function Navbar() {
                 </Link>
 
                 {employee?.role === 'ADMIN' && (
-                  <Link 
-                    href="/admin" 
-                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${pathname === '/admin' ? 'bg-red-500/10 text-red-400' : 'text-slate-400 hover:text-red-400 hover:bg-white/5'}`}
-                  >
-                    <Settings suppressHydrationWarning className="h-4 w-4" />
-                    <span className="hidden sm:inline">Admin</span>
-                  </Link>
+                  <>
+                    <Link 
+                      href="/admin/audit" 
+                      className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${pathname === '/admin/audit' ? 'bg-blue-500/10 text-blue-400' : 'text-slate-400 hover:text-blue-400 hover:bg-white/5'}`}
+                    >
+                      <Shield suppressHydrationWarning className="h-4 w-4" />
+                      <span className="hidden sm:inline">Audit Trail</span>
+                    </Link>
+                    <Link 
+                      href="/admin" 
+                      className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${pathname === '/admin' ? 'bg-red-500/10 text-red-400' : 'text-slate-400 hover:text-red-400 hover:bg-white/5'}`}
+                    >
+                      <Settings suppressHydrationWarning className="h-4 w-4" />
+                      <span className="hidden sm:inline">Admin</span>
+                    </Link>
+                  </>
                 )}
 
                 <button
