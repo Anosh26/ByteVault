@@ -45,6 +45,7 @@ export default function AccountsTable({
               <th className="px-6 py-3 font-medium">Account</th>
               <th className="px-6 py-3 font-medium">Balance</th>
               <th className="px-6 py-3 font-medium">Status</th>
+              <th className="px-6 py-3 font-medium">KYC</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
@@ -53,6 +54,19 @@ export default function AccountsTable({
                 <td className="px-6 py-3 font-mono text-slate-200">{a.account_number}</td>
                 <td className="px-6 py-3 font-medium text-white">{formatInr(Number(a.balance))}</td>
                 <td className="px-6 py-3 text-slate-400">{a.status}</td>
+                <td className="px-6 py-3">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                      a.kyc_status === 'VERIFIED'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : a.kyc_status === 'REJECTED'
+                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    }`}
+                  >
+                    {a.kyc_status ?? 'PENDING'}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>

@@ -37,9 +37,10 @@ accountsRouter.get(
     const limit = Math.min(Number(req.query.limit ?? 50) || 50, 200);
     const offset = Math.max(Number(req.query.offset ?? 0) || 0, 0);
     const q = await poolA().query(
-      `SELECT id, user_id, branch_id, account_number, balance, status, created_at, updated_at
-       FROM accounts
-       ORDER BY created_at DESC
+      `SELECT a.id, a.user_id, a.branch_id, a.account_number, a.balance, a.status, a.created_at, a.updated_at, u.kyc_status
+       FROM accounts a
+       JOIN users u ON a.user_id = u.id
+       ORDER BY a.created_at DESC
        LIMIT $1 OFFSET $2`,
       [limit, offset],
     );
@@ -69,9 +70,10 @@ accountsRouter.get(
   asyncHandler(async (req, res) => {
     const id = req.params.id;
     const q = await poolA().query(
-      `SELECT id, user_id, branch_id, account_number, balance, status, created_at, updated_at
-       FROM accounts
-       WHERE id = $1`,
+      `SELECT a.id, a.user_id, a.branch_id, a.account_number, a.balance, a.status, a.created_at, a.updated_at, u.kyc_status
+       FROM accounts a
+       JOIN users u ON a.user_id = u.id
+       WHERE a.id = $1`,
       [id],
     );
     if (q.rows.length === 0) return res.status(404).json({ error: 'Account not found' });

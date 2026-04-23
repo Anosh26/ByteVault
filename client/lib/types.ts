@@ -13,6 +13,7 @@ export type AccountRow = {
   account_number: string;
   balance: string | number;
   status: string;
+  kyc_status?: 'PENDING' | 'VERIFIED' | 'REJECTED';
   created_at?: string;
 };
 
