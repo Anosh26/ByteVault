@@ -12,6 +12,8 @@ type UserRow = {
   phone: string;
   full_name: string;
   kyc_status: string;
+  total_balance: string;
+  account_count: number;
   created_at: string;
 };
 
@@ -114,6 +116,7 @@ export default function AdminPage() {
       const res = await api.post('/api/admin/jobs/eom-trigger', {});
       setEomResult(res.data);
       setEomState('success');
+      void loadUsers();
     } catch (e: any) {
       setEomResult({ error: e.response?.data?.error || 'EOM failed' });
       setEomState('error');
@@ -192,6 +195,7 @@ export default function AdminPage() {
                        <th className="px-6">Name</th>
                        <th className="px-6">Email / Phone</th>
                        <th className="px-6">KYC Status</th>
+                       <th className="px-6 text-right">Balance</th>
                        <th className="px-6 text-right">Registered</th>
                      </tr>
                    </thead>
@@ -204,6 +208,10 @@ export default function AdminPage() {
                            <div className="text-[10px] text-slate-500 font-mono">{u.phone}</div>
                          </td>
                          <td className="px-6 py-4"><span className={`badge ${u.kyc_status === 'VERIFIED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-400'}`}>{u.kyc_status}</span></td>
+                         <td className="px-6 py-4 text-right">
+                           <span className="font-mono font-bold text-white">{formatInr(Number(u.total_balance))}</span>
+                           <div className="text-[10px] text-slate-500">{u.account_count} account{u.account_count !== 1 ? 's' : ''}</div>
+                         </td>
                          <td className="px-6 py-4 text-right text-slate-500 text-xs">{new Date(u.created_at).toLocaleDateString()}</td>
                        </tr>
                      ))}

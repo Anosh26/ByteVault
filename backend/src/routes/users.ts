@@ -37,9 +37,13 @@ usersRouter.get(
     const offset = Math.max(Number(req.query.offset ?? 0) || 0, 0);
 
     const q = await poolA().query(
-      `SELECT id, email, phone, full_name, kyc_status, created_at
-       FROM users
-       ORDER BY created_at DESC
+      `SELECT u.id, u.email, u.phone, u.full_name, u.kyc_status, u.created_at,
+              COALESCE(SUM(a.balance), 0)::numeric AS total_balance,
+              COUNT(a.id)::int AS account_count
+       FROM users u
+       LEFT JOIN accounts a ON a.user_id = u.id
+       GROUP BY u.id
+       ORDER BY u.created_at DESC
        LIMIT $1 OFFSET $2`,
       [limit, offset],
     );

@@ -29,7 +29,7 @@ BEGIN
 
   EXECUTE $q$
     IMPORT FOREIGN SCHEMA public
-    LIMIT TO (branches, users, employees, accounts, transactions, external_transfers)
+    LIMIT TO (branches, users, employees, accounts, transactions, external_transfers, ledger_accounts, journal_lines)
     FROM SERVER sub_branch
     INTO fdw_sub
   $q$;

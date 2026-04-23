@@ -26,10 +26,18 @@ jobsRouter.post(
       await client.query('REFRESH MATERIALIZED VIEW CONCURRENTLY ledger_daily_balances');
 
       const clearingCheck = await client.query(`
-        SELECT COALESCE(SUM(jl.amount_cents), 0)::bigint AS net_cents
-        FROM journal_lines jl
-        JOIN ledger_accounts la ON la.id = jl.ledger_account_id
-        WHERE la.code = 'CLEARING_INTERBRANCH'
+        SELECT COALESCE(SUM(net), 0)::bigint AS net_cents
+        FROM (
+          SELECT SUM(jl.amount_cents) AS net
+          FROM journal_lines jl
+          JOIN ledger_accounts la ON la.id = jl.ledger_account_id
+          WHERE la.code = 'CLEARING_INTERBRANCH'
+          UNION ALL
+          SELECT SUM(fjl.amount_cents) AS net
+          FROM fdw_sub.journal_lines fjl
+          JOIN fdw_sub.ledger_accounts fla ON fla.id = fjl.ledger_account_id
+          WHERE fla.code = 'CLEARING_INTERBRANCH'
+        ) combined
       `);
       const clearingNet = Number(clearingCheck.rows[0].net_cents);
 
@@ -82,19 +90,29 @@ jobsRouter.post(
           AND ROUND(a.balance::numeric, 2) > 0
       `);
 
-      let accrualCount = 0;
+      const insertValues: string[] = [];
+      const insertParams: any[] = [];
+      let paramIndex = 1;
+
       for (const acct of activeAccounts.rows) {
         const balanceCents = Math.round(Number(acct.balance) * 100);
         const dailyInterestCents = Math.floor((balanceCents * 4) / 36500);
-        if (dailyInterestCents <= 0) continue;
 
+        if (dailyInterestCents > 0) {
+          insertValues.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, 'PENDING')`);
+          insertParams.push(acct.id, today, dailyInterestCents);
+        }
+      }
+
+      let accrualCount = 0;
+      if (insertValues.length > 0) {
         await client.query(
           `INSERT INTO interest_accruals (account_id, accrual_date, amount_cents, status)
-           VALUES ($1, $2, $3, 'PENDING')
+           VALUES ${insertValues.join(', ')}
            ON CONFLICT (account_id, accrual_date) DO NOTHING`,
-          [acct.id, today, dailyInterestCents],
+          insertParams
         );
-        accrualCount++;
+        accrualCount = insertValues.length;
       }
 
       await client.query('COMMIT');
@@ -129,9 +147,14 @@ jobsRouter.post(
       await client.query('BEGIN');
 
       const pendingAccruals = await client.query(`
+        WITH locked_accruals AS (
+          SELECT id, account_id, amount_cents
+          FROM interest_accruals
+          WHERE status = 'PENDING'
+          FOR UPDATE
+        )
         SELECT account_id, SUM(amount_cents)::bigint AS total_cents, array_agg(id) AS accrual_ids
-        FROM interest_accruals
-        WHERE status = 'PENDING'
+        FROM locked_accruals
         GROUP BY account_id
       `);
 

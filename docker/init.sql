@@ -14,6 +14,12 @@ CREATE TABLE branches (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+INSERT INTO branches (branch_code, ifsc_code, name, location)
+VALUES 
+    ('MAIN', 'BYTV0000001', 'ByteVault Main Branch', 'Mumbai HQ'),
+    ('SUB', 'BYTV0000002', 'ByteVault Sub Branch', 'Goa Hub')
+ON CONFLICT (branch_code) DO NOTHING;
+
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
