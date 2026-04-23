@@ -25,6 +25,7 @@ The relational schema enforces strict integrity.
 \section{Performance Aspects}
 \begin{itemize}
     \item \textbf{Circuit Breakers:} FDW queries utilize strict \texttt{statement\_timeout} configurations so a downed remote branch does not indefinitely hang the main API.
-    \item \textbf{Materialized Views:} Ledger balances are aggregated into daily materialized views to prevent expensive recalculations of the entire journal history on every read.
+    \item \textbf{Materialized Views:} Ledger balances are aggregated into daily materialized views to prevent expensive recalculations of the entire journal history. These are refreshed concurrently during EOD batch jobs.
+    \item \textbf{Batch Processing Logic:} Heavy calculations (interest accrual) are offloaded to admin-triggered batch jobs with optimistic concurrency control (FOR UPDATE) to prevent double-posting.
     \item \textbf{Connection Pooling:} Efficient handling of concurrent database connections using the \texttt{pg} driver.
 \end{itemize}

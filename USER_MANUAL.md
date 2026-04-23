@@ -106,3 +106,24 @@ If you haven't spun up the environment, follow these steps from the repository r
 2. **Apply Migrations:** Run all `.sql` migrations in `/docker` targeting `branch_a_db` and `branch_b_db` to setup FDW, Ledger constraints, and Reversals.
 3. **Backend:** Navigate to `backend/`, copy `.env.example` to `.env`, and execute `bun install && bun run dev`.
 4. **Client:** Navigate to `client/`, copy `.env.example` to `.env.local`, and execute `npm install && npm run dev`. Valid operations can now be done via the client web-app running at `http://localhost:3000`.
+## 5. Administrative Batch Jobs
+
+The system includes a **Batch Processing Engine** for handling time-sensitive financial operations. These can be triggered from the **Admin Terminal > Batch Jobs** tab.
+
+### End of Day (EOD) Settlement
+*   **Purpose**: Validates the system's daily health and prepares interest data.
+*   **Operations**:
+    1.  Refreshes the Materialized Views for the ledger.
+    2.  Verifies the `CLEARING_INTERBRANCH` account across all branches. If the branches are out of sync (net balance != 0), the job will abort with a critical error.
+    3.  Calculates daily interest (4% p.a.) for all active accounts and stages them in the `interest_accruals` table.
+
+### End of Month (EOM) Interest Posting
+*   **Purpose**: Officially credits customers with their earned interest.
+*   **Operations**:
+    1.  Aggregates all "Pending" accruals for each account.
+    2.  Creates a balanced Journal Entry (Debit Interest Expense / Credit Customer).
+    3.  Updates the live balance of the customer accounts.
+    4.  Marks the accruals as "Posted" to prevent double-charging.
+
+> [!NOTE]
+> All batch jobs are idempotent and utilize **Row-Level Locking (FOR UPDATE)** to ensure that concurrent triggers do not cause data drift or double-posting.

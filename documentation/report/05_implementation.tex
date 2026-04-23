@@ -6,6 +6,8 @@
     \item \textbf{Ledger Service:} Enforces double-entry rules. It handles deposits, fees, and cross-account transfers by generating paired debit/credit journal lines.
     \item \textbf{Transfer Coordinator:} Manages the Maker/Checker state machine and the complex 2PC execution across the FDW-linked databases.
     \item \textbf{Compliance Module:} Manages KYC tracking and surfaces the visual badges to the Next.js UI, alongside the \texttt{auditRouter} for tracking administrative actions.
+    \item \textbf{Batch Processing Engine:} Orchestrates End-of-Day (EOD) and End-of-Month (EOM) operations, including cross-branch clearing validation and interest posting.
+    \item \textbf{Dev Infrastructure:} A unified runner script (\texttt{dev.ps1} / \texttt{dev.sh}) that manages Docker, environment variables, and parallel server execution.
 \end{itemize}
 
 \section{Member Specific Implementation}
@@ -16,7 +18,9 @@
 \begin{itemize}
     \item Configured the Docker environment and PostgreSQL 2PC/FDW topology.
     \item Implemented the core Ledger Service and Idempotency middleware.
-    \item Developed the Next.js frontend dashboard and transfer approval UI.
+    \item Developed the Next.js frontend dashboard, transfer approval UI, and Admin Batch Job controls.
+    \item Implemented the EOD/EOM Batch Processing Engine with strict ACID compliance (FOR UPDATE locking).
+    \item Created the unified project dev runner for streamlined server orchestration.
 \end{itemize}
 
 \subsection{Member 2: [Name Here]}
