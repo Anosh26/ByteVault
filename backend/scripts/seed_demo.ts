@@ -39,8 +39,8 @@ async function seed() {
       { type: 'EMPLOYEE', action: 'TRANSFER_REVERSED', entity: 'LEDGER', meta: { original_tx: 'TX-9982' } }
     ];
 
-    // Clear old logs for demo
-    await poolA().query("DELETE FROM audit_logs");
+    // Do not clear old logs for demo so they accumulate
+
 
     for (const a of auditActions) {
       await poolA().query(
