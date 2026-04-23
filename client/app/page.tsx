@@ -1,8 +1,20 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function RootPage() {
-  // We leave this empty because Middleware handles the redirect.
-  // If Middleware fails for some reason, this just shows a blank screen 
-  // instead of the messy Next.js default template.
-  return null; 
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = window.sessionStorage.getItem('bytevault_access_token');
+    if (token) {
+      router.push('/dashboard');
+    } else {
+      router.push('/login');
+    }
+  }, [router]);
+
+  return null;
 }
 
