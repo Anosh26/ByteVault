@@ -1,0 +1,19 @@
+\section{Problem Statement}
+
+Modern banking systems face a fundamental trilemma when scaling operations across geographically distributed branches: achieving high availability, maintaining strict data consistency (ACID guarantees), and minimizing network latency. 
+
+\subsection{The Flaws of Centralization}
+A traditional monolithic banking architecture relies on a single, centralized relational database to record all transactions. While this guarantees ACID compliance natively, it introduces critical vulnerabilities:
+\begin{itemize}
+    \item \textbf{Single Point of Failure}: If the central database experiences downtime, all branches are immediately offline.
+    \item \textbf{Latency}: Remote branches communicating with a distant central server suffer from network latency, slowing down routine local operations (like cash deposits or local transfers).
+    \item \textbf{Scalability Bottlenecks}: As transaction volume grows, scaling a single monolithic relational database vertically becomes prohibitively expensive.
+\end{itemize}
+
+\subsection{The Challenge of Decentralization in Finance}
+To resolve latency and single-point-of-failure risks, systems can be decentralized, giving each branch its own database. However, this introduces a severe problem for cross-branch operations: \textit{Distributed Transactions}.
+
+If a user at Branch A transfers funds to a user at Branch B, the system must deduct funds from Database A and credit Database B. If the network fails immediately after deducting from Database A but before crediting Database B, the funds are permanently lost. If NoSQL databases with "Eventual Consistency" are used, an account balance might temporarily read incorrectly, allowing a user to double-spend funds before the ledger converges.
+
+\subsection{Objective}
+The objective of the ByteVault project is to design and implement a distributed banking architecture that successfully bridges this gap. The system must provide local databases for individual branches to ensure low latency and isolated failure domains, while employing advanced database replication (Foreign Data Wrappers) and coordination protocols (Two-Phase Commit) to absolutely guarantee that cross-branch transactions are atomic, consistent, isolated, and durable (ACID).

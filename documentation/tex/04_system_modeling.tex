@@ -1,0 +1,123 @@
+\section{System Modeling}
+
+This section provides formal visual representations of the ByteVault architecture, demonstrating the network topology, distributed transaction workflow, and ledger data integrity constraints.
+
+\subsection{System Architecture Topology}
+
+ByteVault utilizes a decoupled, multi-tier architecture. The frontend communicates via RESTful APIs to the Bun backend, which acts as the transaction coordinator for the distributed PostgreSQL nodes.
+
+\begin{center}
+\begin{verbatim}
+```mermaid
+graph TD
+    Client[Next.js Client (Employee UI)] -->|REST / JWT| API[Bun + Express Backend]
+    
+    subgraph Distributed Databases
+        API -->|TCP 5432| DB_Main[(Main Branch DB\nPostgreSQL)]
+        API -->|TCP 5432| DB_Sub[(Sub Branch DB\nPostgreSQL)]
+    end
+    
+    DB_Main <.->|Postgres FDW\nRead Replica Link| DB_Sub
+    
+    style Client fill:#0070f3,stroke:#fff,stroke-width:2px,color:#fff
+    style API fill:#fbf0df,stroke:#000,stroke-width:2px,color:#000
+    style DB_Main fill:#336791,stroke:#fff,stroke-width:2px,color:#fff
+    style DB_Sub fill:#336791,stroke:#fff,stroke-width:2px,color:#fff
+```
+\end{verbatim}
+\end{center}
+
+\subsection{Sequence Diagram: Cross-Branch Two-Phase Commit}
+
+The following diagram illustrates the Maker/Checker workflow. A Maker initiates a transfer, which places a hold on funds. A Checker then approves it, triggering the Two-Phase Commit (2PC) protocol across both databases to ensure atomicity.
+
+\begin{center}
+\begin{verbatim}
+```mermaid
+sequenceDiagram
+    actor Maker
+    actor Checker
+    participant API as Backend (Bun)
+    participant DB_A as Main DB (Sender)
+    participant DB_B as Sub DB (Receiver)
+
+    Maker->>API: POST /api/transfers (From: A, To: B)
+    API->>DB_A: Calculate Available Balance & Create Hold
+    DB_A-->>API: Hold Confirmed (FUNDS LOCKED)
+    API-->>Maker: 201 Created (Status: PENDING)
+
+    Checker->>API: POST /api/transfers/:id/approve
+    API->>DB_A: PREPARE TRANSACTION 'tx_A' (Debit A)
+    API->>DB_B: PREPARE TRANSACTION 'tx_B' (Credit B)
+    
+    alt Both Prepare Successfully
+        DB_A-->>API: PREPARED
+        DB_B-->>API: PREPARED
+        API->>DB_A: COMMIT PREPARED 'tx_A'
+        API->>DB_B: COMMIT PREPARED 'tx_B'
+        API->>DB_A: Update Hold to CAPTURED
+        API-->>Checker: 200 OK (Status: EXECUTED)
+    else Any DB Fails Prepare
+        DB_A-->>API: ROLLBACK
+        DB_B-->>API: ERROR (Timeout/Constraint)
+        API->>DB_A: ROLLBACK PREPARED 'tx_A'
+        API->>DB_A: Update Hold to RELEASED
+        API-->>Checker: 500 Error (Status: FAILED)
+    end
+```
+\end{verbatim}
+\end{center}
+
+\subsection{Entity-Relationship (ER) Model}
+
+The database schema enforces a strict double-entry ledger. Every financial event is tracked via immutable journal entries.
+
+\begin{center}
+\begin{verbatim}
+```mermaid
+erDiagram
+    USERS ||--o{ ACCOUNTS : owns
+    BRANCHES ||--o{ ACCOUNTS : hosts
+    BRANCHES ||--o{ EMPLOYEES : employs
+    
+    ACCOUNTS ||--o{ ACCOUNT_HOLDS : has
+    ACCOUNTS ||--o| LEDGER_ACCOUNTS : "mapped to"
+    
+    EMPLOYEES ||--o{ TRANSFER_REQUESTS : "maker"
+    EMPLOYEES ||--o{ TRANSFER_REQUESTS : "checker"
+    
+    TRANSFER_REQUESTS ||--o| ACCOUNT_HOLDS : "reserves funds via"
+    
+    JOURNAL_ENTRIES ||--|{ JOURNAL_LINES : contains
+    LEDGER_ACCOUNTS ||--o{ JOURNAL_LINES : "balances updated by"
+    
+    EMPLOYEES ||--o{ JOURNAL_ENTRIES : creates
+    
+    AUDIT_LOGS }o--|| EMPLOYEES : "actor (optional)"
+    AUDIT_LOGS }o--|| USERS : "actor (optional)"
+
+    ACCOUNTS {
+        uuid id PK
+        uuid user_id FK
+        uuid branch_id FK
+        string account_number
+        decimal balance
+        string status
+    }
+    
+    JOURNAL_ENTRIES {
+        uuid id PK
+        string kind
+        string external_ref
+        uuid reversal_of_entry_id FK
+    }
+
+    JOURNAL_LINES {
+        uuid id PK
+        uuid entry_id FK
+        uuid ledger_account_id FK
+        bigint amount_cents
+    }
+```
+\end{verbatim}
+\end{center}

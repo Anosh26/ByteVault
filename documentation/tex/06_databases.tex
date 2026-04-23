@@ -2,6 +2,14 @@
 
 ByteVault relies on a distributed PostgreSQL architecture designed to simulate a multi-branch banking environment. This architecture enforces strict separation of data at the storage level while allowing secure, atomic cross-branch transactions.
 
+\subsection{Technology Justification: Why PostgreSQL?}
+While NoSQL databases (like MongoDB or Cassandra) excel in horizontal scalability and schema flexibility, ByteVault explicitly mandates \textbf{PostgreSQL} for its ledger foundation. This choice is rooted in the mathematical requirements of financial systems:
+\begin{itemize}
+    \item \textbf{Strict ACID Compliance}: Financial ledgers cannot tolerate "eventual consistency." If money is deducted from Account A, it must be instantaneously and atomically credited to Account B. PostgreSQL provides rock-solid ACID guarantees natively.
+    \item \textbf{Relational Integrity}: The double-entry ledger requires complex foreign-key constraints (e.g., ensuring a \texttt{journal\_line} maps to a valid \texttt{ledger\_account}). Relational databases enforce this structural integrity at the storage layer.
+    \item \textbf{Advanced Distributed Features}: PostgreSQL natively supports the Two-Phase Commit (2PC) protocol and Foreign Data Wrappers (FDW), which are essential for coordinating cross-branch transactions in ByteVault.
+\end{itemize}
+
 \subsection{Multi-Container Setup}
 The system utilizes two distinct PostgreSQL instances, defined in \texttt{docker-compose.yml}:
 \begin{itemize}

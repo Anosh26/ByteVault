@@ -2,6 +2,14 @@
 
 The backend of ByteVault is a high-performance HTTP API built with \textbf{Bun} and \textbf{Express}. It utilizes TypeScript for type safety and \texttt{zod} for strict runtime schema validation.
 
+\subsection{Technology Justification: Why Bun?}
+Node.js has been the industry standard for server-side JavaScript for over a decade. However, ByteVault explicitly chose \textbf{Bun} for its backend runtime for several critical reasons:
+\begin{itemize}
+    \item \textbf{Native TypeScript Support}: Bun executes \texttt{.ts} files directly without requiring a pre-compilation step (like \texttt{tsc} or \texttt{ts-node}), dramatically reducing Docker build times and simplifying the CI/CD pipeline.
+    \item \textbf{Performance}: Bun includes a highly optimized SQLite driver and native bindings for core APIs that drastically outperform Node.js in high-throughput transactional environments.
+    \item \textbf{Developer Ergonomics}: Built-in tools like a lightning-fast package manager, native testing suite, and hot-module reloading make iterating on complex distributed workflows much faster.
+\end{itemize}
+
 \subsection{Architectural Pattern}
 The application recently transitioned from a tightly-coupled Router-Controller model to a \textbf{Layered Service Architecture}. This isolates business logic, database queries, and HTTP transport layers.
 

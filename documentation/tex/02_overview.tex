@@ -8,6 +8,14 @@ ByteVault is a mission-critical core banking system designed for high reliabilit
   \item \textbf{Distributed Databases}: Two \textbf{PostgreSQL 16} instances representing geographically distinct branches (Main and Sub), containerized for consistent deployment via Docker.
 \end{itemize}
 
+\subsection{Technology Justification: Why Next.js?}
+The frontend architecture utilizes \textbf{Next.js} over standard Single Page Application (SPA) libraries like basic React or Vue. This decision was driven by the need for:
+\begin{itemize}
+    \item \textbf{Server-Side Rendering (SSR)}: Financial dashboards require rapid First Contentful Paint (FCP) and secure, server-side data fetching to prevent sensitive API endpoints from being exposed in client-side bundles.
+    \item \textbf{Middleware and Proxies}: Next.js provides robust Edge Middleware capabilities, allowing the application to intercept, validate, and proxy requests to the Bun backend securely without CORS complexities.
+    \item \textbf{App Router Architecture}: The nested routing system cleanly separates employee workflows (e.g., Maker vs. Checker vs. Admin) into distinct, easily auditable layout boundaries.
+\end{itemize}
+
 \subsection{Differentiating Technologies}
 The system employs advanced database patterns to solve common distributed banking problems:
 \begin{itemize}

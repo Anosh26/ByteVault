@@ -1,0 +1,26 @@
+\section{Limitations and Future Scope}
+
+While ByteVault successfully demonstrates a robust, distributed double-entry ledger capable of executing ACID-compliant cross-branch transactions, it remains an academic prototype. Several components necessary for a production-grade banking system have been omitted or mocked to constrain the project's scope. 
+
+\subsection{Current System Limitations}
+
+\begin{enumerate}
+    \item \textbf{Absence of End-of-Day (EOD) Batch Processing}: 
+    Real-world banking systems rely heavily on nightly batch jobs to calculate and post interest accruals, charge monthly maintenance fees, and generate clearing settlement files. Currently, ByteVault only supports real-time transactional processing. The ledger does not include a cron-based batch engine for mass automated \texttt{JOURNAL\_ENTRY} generation.
+    
+    \item \textbf{Mocked Compliance and AML Facades}: 
+    The Know Your Customer (KYC) onboarding pipeline and Anti-Money Laundering (AML) alert mechanisms are presently implemented as visual facades on the frontend. The backend tracks a simple \texttt{kyc\_status} string enum (\texttt{VERIFIED}, \texttt{PENDING}, \texttt{REJECTED}), but there is no integration with actual identity verification services (e.g., Jumio, Onfido) or heuristic engines to detect structuring or suspicious velocity patterns.
+    
+    \item \textbf{Hardcoded Network Topologies}: 
+    The current Two-Phase Commit (2PC) protocol and Foreign Data Wrapper (FDW) setup strictly assumes a binary branch network (Main and Sub). Scaling this to $N$ branches would require a dynamic service registry and a more robust distributed transaction manager (such as a Saga execution coordinator) rather than statically defined PostgreSQL connection pools.
+\end{enumerate}
+
+\subsection{Future Scope}
+
+To evolve ByteVault from an architectural prototype into a viable core banking product, the following milestones should be targeted in future iterations:
+
+\begin{itemize}
+    \item \textbf{Implementation of a Saga Pattern}: Replacing the synchronous database-level 2PC with an application-level Saga pattern using a message broker (e.g., Apache Kafka or RabbitMQ) to improve availability and prevent database lock contention during network partitions.
+    \item \textbf{Automated Compliance Engine}: Integrating a lightweight rule-engine to automatically flag transactions over specific thresholds for AML review before Checker approval.
+    \item \textbf{Reporting Data Warehouse}: Setting up a read-heavy OLAP database that asynchronously replicates ledger data from both branches to serve complex reconciliation queries without impacting the transactional (OLTP) databases.
+\end{itemize}
