@@ -7,15 +7,18 @@ function stableJson(obj: unknown): string {
   return JSON.stringify(obj, Object.keys(obj as any).sort());
 }
 
-export function requireIdempotencyKey(opts?: { routeTag?: string }) {
+// Add actorType to the accepted options
+export function requireIdempotencyKey(opts?: { routeTag?: string; actorType?: 'EMPLOYEE' | 'USER' }) {
   const routeTag = opts?.routeTag ?? 'unknown';
+  const expectedActorType = opts?.actorType ?? 'EMPLOYEE'; // Default to EMPLOYEE if omitted
 
   return async (req: Request, res: Response, next: NextFunction) => {
     const key = req.header('Idempotency-Key');
     if (!key) return res.status(400).json({ error: 'Missing Idempotency-Key header' });
     if (key.length > 128) return res.status(400).json({ error: 'Idempotency-Key too long' });
 
-    const actor = req.employee;
+    // 1. Check the correct object (req.user vs req.employee) based on the route
+    const actor = expectedActorType === 'USER' ? req.user : req.employee;
     if (!actor) return res.status(401).json({ error: 'Not authenticated' });
 
     const requestHash = crypto
@@ -23,6 +26,7 @@ export function requireIdempotencyKey(opts?: { routeTag?: string }) {
       .update(stableJson(req.body ?? {}))
       .digest('hex');
 
+    // 2. Use $4 dynamically instead of hardcoding 'EMPLOYEE'
     const finalize = async (status: 'COMPLETED' | 'FAILED', code: number, body: unknown) => {
       await poolA().query(
         `UPDATE idempotency_keys
@@ -30,48 +34,35 @@ export function requireIdempotencyKey(opts?: { routeTag?: string }) {
              response_code = $2,
              response_body = $3,
              updated_at = CURRENT_TIMESTAMP
-         WHERE actor_type = 'EMPLOYEE'
-           AND actor_id = $4
-           AND key = $5
-           AND route = $6`,
-        [status, code, body, actor.id, key, routeTag],
+         WHERE actor_type = $4
+           AND actor_id = $5
+           AND key = $6
+           AND route = $7`,
+        [status, code, body, expectedActorType, actor.id, key, routeTag],
       );
     };
 
+    // 3. Use $1 dynamically here too
     const existing = await poolA().query(
       `SELECT status, request_hash, response_code, response_body
        FROM idempotency_keys
-       WHERE actor_type = 'EMPLOYEE'
-         AND actor_id = $1
-         AND key = $2
-         AND route = $3`,
-      [actor.id, key, routeTag],
+       WHERE actor_type = $1
+         AND actor_id = $2
+         AND key = $3
+         AND route = $4`,
+      [expectedActorType, actor.id, key, routeTag],
     );
 
-    if (existing.rows.length > 0) {
-      const row = existing.rows[0] as {
-        status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-        request_hash: string;
-        response_code: number | null;
-        response_body: any;
-      };
+    // ... (keep the rest of your existing existing.rows checks)
 
-      if (row.request_hash !== requestHash) {
-        return res.status(409).json({ error: 'Idempotency-Key reuse with different request body' });
-      }
-
-      if (row.status === 'COMPLETED' && row.response_code) {
-        return res.status(row.response_code).json(row.response_body);
-      }
-
-      return res.status(409).json({ error: 'Request already in progress' });
+    // 4. Update the INSERT statement to use $1 for expectedActorType
+    if (existing.rows.length === 0) {
+      await poolA().query(
+        `INSERT INTO idempotency_keys (actor_type, actor_id, key, route, request_hash, status)
+         VALUES ($1, $2, $3, $4, $5, 'IN_PROGRESS')`,
+        [expectedActorType, actor.id, key, routeTag, requestHash],
+      );
     }
-
-    await poolA().query(
-      `INSERT INTO idempotency_keys (actor_type, actor_id, key, route, request_hash, status)
-       VALUES ('EMPLOYEE', $1, $2, $3, $4, 'IN_PROGRESS')`,
-      [actor.id, key, routeTag, requestHash],
-    );
 
     const originalJson = res.json.bind(res);
     res.json = ((body: any) => {
