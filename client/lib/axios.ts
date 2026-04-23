@@ -9,7 +9,7 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = window.localStorage.getItem('bytevault_access_token');
+    const token = window.sessionStorage.getItem('bytevault_access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -22,8 +22,7 @@ api.interceptors.response.use(
   (err) => {
     const status = err?.response?.status;
     if (status === 401 && typeof window !== 'undefined') {
-      window.localStorage.removeItem('bytevault_access_token');
-      document.cookie = 'bv_logged_in=; path=/; max-age=0';
+      window.sessionStorage.removeItem('bytevault_access_token');
       const path = window.location.pathname;
       if (!path.startsWith('/login')) {
         window.location.assign('/login');

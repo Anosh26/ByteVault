@@ -29,7 +29,7 @@ export default function CustomerTransfer() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('customerToken');
+      const token = sessionStorage.getItem('customerToken');
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       const payload = {

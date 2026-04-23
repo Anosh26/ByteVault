@@ -48,7 +48,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const isLoginPage = pathname === '/portal/login';
 
   const loadData = useCallback(async () => {
-    const token = localStorage.getItem('customerToken');
+    const token = sessionStorage.getItem('customerToken');
     if (!token) {
       router.push('/portal/login');
       return;
@@ -58,7 +58,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       const res = await api.get('/api/customer/dashboard');
       setData(res.data);
     } catch {
-      localStorage.removeItem('customerToken');
+      sessionStorage.removeItem('customerToken');
       router.push('/portal/login');
     } finally {
       setLoading(false);
@@ -89,7 +89,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   );
 
   function handleLogout() {
-    localStorage.removeItem('customerToken');
+    sessionStorage.removeItem('customerToken');
     router.push('/portal/login');
   }
 

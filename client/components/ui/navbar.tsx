@@ -14,7 +14,7 @@ export default function Navbar() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = window.localStorage.getItem('bytevault_access_token');
+    const token = window.sessionStorage.getItem('bytevault_access_token');
     if (!token) {
       setEmployee(null);
       setReady(true);
@@ -28,8 +28,7 @@ export default function Navbar() {
   }, [pathname]);
 
   const logout = () => {
-    window.localStorage.removeItem('bytevault_access_token');
-    document.cookie = 'bv_logged_in=; path=/; max-age=0';
+    window.sessionStorage.removeItem('bytevault_access_token');
     setEmployee(null);
     router.push('/login');
     router.refresh();

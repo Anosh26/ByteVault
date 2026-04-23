@@ -20,8 +20,7 @@ export default function LoginPage() {
       const res = await api.post('/api/auth/employee/login', { email, password });
       const { accessToken } = res.data ?? {};
       if (!accessToken) throw new Error('No access token returned');
-      window.localStorage.setItem('bytevault_access_token', accessToken);
-      document.cookie = `bv_logged_in=true; path=/; max-age=${60 * 60 * 2}`;
+      window.sessionStorage.setItem('bytevault_access_token', accessToken);
       router.push('/dashboard');
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || 'Login failed';

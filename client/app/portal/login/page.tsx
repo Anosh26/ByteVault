@@ -18,7 +18,7 @@ export default function CustomerLogin() {
     setError(null);
     try {
       const res = await api.post('/api/customer/auth/login', { email, password });
-      localStorage.setItem('customerToken', res.data.accessToken);
+      sessionStorage.setItem('customerToken', res.data.accessToken);
       
       // Override axios default just for this session demo
       api.defaults.headers.common['Authorization'] = `Bearer ${res.data.accessToken}`;
