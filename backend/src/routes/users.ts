@@ -92,3 +92,31 @@ usersRouter.get(
   }),
 );
 
+const kycSchema = z.object({
+  status: z.enum(['VERIFIED', 'REJECTED']),
+});
+
+usersRouter.post(
+  '/:id/kyc',
+  requireEmployeeAuth,
+  requireEmployeeRole('MAKER', 'CHECKER', 'MANAGER', 'ADMIN'),
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const body = parseOrThrow(kycSchema, req.body);
+
+    const q = await poolA().query(
+      `UPDATE users
+       SET kyc_status = $1
+       WHERE id = $2
+       RETURNING id, email, full_name, kyc_status`,
+      [body.status, id],
+    );
+
+    if (q.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user: q.rows[0] });
+  }),
+);
+

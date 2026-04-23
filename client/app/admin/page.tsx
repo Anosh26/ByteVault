@@ -157,6 +157,15 @@ export default function AdminPage() {
     }
   }
 
+  async function handleKycUpdate(userId: string, status: 'VERIFIED' | 'REJECTED') {
+    try {
+      await api.post(`/api/users/${userId}/kyc`, { status });
+      void loadUsers();
+    } catch (e: any) {
+      alert(e.response?.data?.error || 'Failed to update KYC');
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#020617] flex">
       {/* Admin Sidebar */}
@@ -236,7 +245,19 @@ export default function AdminPage() {
                            <div className="text-slate-300">{u.email}</div>
                            <div className="text-[10px] text-slate-500 font-mono">{u.phone}</div>
                          </td>
-                         <td className="px-6 py-4"><span className={`badge ${u.kyc_status === 'VERIFIED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-400'}`}>{u.kyc_status}</span></td>
+                         <td className="px-6 py-4">
+                           <div className="flex items-center gap-2">
+                             <span className={`badge ${u.kyc_status === 'VERIFIED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : u.kyc_status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
+                               {u.kyc_status}
+                             </span>
+                             {u.kyc_status === 'PENDING' && (
+                               <>
+                                 <button onClick={() => handleKycUpdate(u.id, 'VERIFIED')} className="bg-emerald-600/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-emerald-600/40 transition-colors border border-emerald-500/20">Verify</button>
+                                 <button onClick={() => handleKycUpdate(u.id, 'REJECTED')} className="bg-red-600/20 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold hover:bg-red-600/40 transition-colors border border-red-500/20">Reject</button>
+                               </>
+                             )}
+                           </div>
+                         </td>
                          <td className="px-6 py-4 text-right">
                            <span className="font-mono font-bold text-white">{formatInr(Number(u.total_balance))}</span>
                            <div className="text-[10px] text-slate-500">{u.account_count} account{u.account_count !== 1 ? 's' : ''}</div>
