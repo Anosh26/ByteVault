@@ -2,7 +2,6 @@
 
 Welcome to the ByteVault Banking System. This document serves as a comprehensive manual for the entire application, covering architecture, employee roles, daily operations, fraud management, and batch processing.
 
-*Note: This manual was generated in phases.*
 
 ---
 
