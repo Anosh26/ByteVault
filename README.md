@@ -67,7 +67,23 @@ Health check:
 curl http://localhost:4000/health
 ```
 
-## 4) Client (Next.js)
+## 4) Populate Data
+Once the backend is running, you need to create an employee and some demo data.
+
+### Onboard an Employee (Admin)
+```bash
+cd backend
+bun run onboard --email admin@bytevault.com --password securepass --role ADMIN --branch MAIN --name "Admin User"
+```
+
+### Seed Demo Users & Accounts
+```bash
+cd backend
+bun run seed-demo
+```
+This creates a verified user (`john.doe@example.com`) and an account with **₹50,000**.
+
+## 5) Client (Next.js)
 
 Create env:
 

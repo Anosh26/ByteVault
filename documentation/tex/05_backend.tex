@@ -67,3 +67,13 @@ export type JwtEmployeeClaims = {
 \end{lstlisting}
 
 \textbf{Why it is there:} Stateless JWTs eliminate the need for server-side session stores, improving scalability. The JWT explicitly embeds the \texttt{branchName} and \texttt{role} (e.g., MAKER, ADMIN) so the frontend can quickly render UI elements without additional API calls.
+\subsection{Audit Logging System}
+Auditability is a regulatory requirement for banking systems. ByteVault implements a unified \texttt{audit\_logs} table that records every administrative and financial action.
+
+\begin{itemize}
+    \item \textbf{Actor Tracking}: Logs the ID and type (User/Employee) of the person performing the action.
+    \item \textbf{Entity Relationship}: Links logs to specific entities (Accounts, Transfers, etc.) via UUIDs.
+    \item \textbf{Rich Metadata}: Stores a JSONB blob (\texttt{meta}) containing context like the previous state of a record or the reason for a manual adjustment.
+\end{itemize}
+
+\textbf{Why it is there:} In the event of a dispute or security incident, the Audit Trail provides a tamper-evident record of exactly who did what and when. The use of JSONB for metadata allows the schema to remain flexible as new features are added without requiring table migrations.

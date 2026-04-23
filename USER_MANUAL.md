@@ -60,7 +60,27 @@ Since the application supports cached customer balances for ultra-fast reads, Ad
 
 ---
 
-## 5. Idempotency & Safety
+## 5. Compliance & Auditing
+
+ByteVault includes dedicated modules for regulatory compliance and operational transparency.
+
+### A. KYC (Know Your Customer)
+All users in the system are assigned a KYC status which determines their eligibility for banking services.
+*   **PENDING:** Newly created users. They cannot yet open accounts or initiate transfers.
+*   **VERIFIED:** Users who have passed verification. Full access to banking features.
+*   **REJECTED:** Users who failed verification. Their accounts are frozen and cannot receive or send funds.
+
+Employee dashboards display these statuses clearly with color-coded badges to prevent accidental processing of unverified transactions.
+
+### B. System Audit Trail
+For security and troubleshooting, the system maintains a high-fidelity audit trail of all sensitive operations.
+*   **Automatic Logging:** Every account creation, transfer approval, and ledger adjustment is logged.
+*   **Actor Identification:** Logs include the UUID of the employee or user who performed the action.
+*   **Metadata Inspection:** Detailed context for each action is stored in JSON format (e.g., exact transfer amounts, approval notes, or failure reasons).
+
+Administrators can access the global audit feed at `/admin/audit` to monitor system health and employee performance.
+
+## 6. Idempotency & Safety
 
 All state-altering requests (like creating transfers, approving, or posting ledger entries) require an `Idempotency-Key` header.
 
@@ -69,7 +89,7 @@ All state-altering requests (like creating transfers, approving, or posting ledg
 
 ---
 
-## Getting Started (Quick Run)
+## 7. Getting Started (Quick Run)
 
 If you haven't spun up the environment, follow these steps from the repository root:
 

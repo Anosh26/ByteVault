@@ -1,8 +1,17 @@
 \section{Overview}
-ByteVault is a banking management application with:
-\begin{itemize}[nosep]
-  \item A \textbf{Next.js} client (frontend).
-  \item A \textbf{Bun + Express} API server (backend).
-  \item \textbf{Two PostgreSQL 16} databases (Main branch and Sub branch) running in Docker.
-  \item Cross-database integration using \textbf{Foreign Data Wrapper (FDW)} and cross-branch settlement correctness using \textbf{Two-Phase Commit (2PC)}.
+ByteVault is a mission-critical core banking system designed for high reliability and transactional integrity across distributed branches. It serves as a unified platform for managing user accounts, ledger operations, and cross-branch fund transfers.
+
+\subsection{Key Components}
+\begin{itemize}
+  \item \textbf{Frontend (Client)}: A modern, responsive \textbf{Next.js} dashboard for employees and administrators, featuring real-time data visualization and secure workflow management.
+  \item \textbf{Backend (Server)}: A high-performance \textbf{Bun + Express} API server that handles business logic, authentication, and database orchestration.
+  \item \textbf{Distributed Databases}: Two \textbf{PostgreSQL 16} instances representing geographically distinct branches (Main and Sub), containerized for consistent deployment via Docker.
+\end{itemize}
+
+\subsection{Differentiating Technologies}
+The system employs advanced database patterns to solve common distributed banking problems:
+\begin{itemize}
+  \item \textbf{Foreign Data Wrapper (FDW)}: Enables the Main branch to query Sub branch data natively, allowing for unified reporting and simplified cross-branch lookups.
+  \item \textbf{Two-Phase Commit (2PC)}: Guarantees atomicity for cross-branch transfers. Money is never "lost" between databases; either both branches commit the transaction or both roll back, even in the event of a partial system failure.
+  \item \textbf{Double-Entry Ledger}: All financial operations are backed by a robust ledger system (Journal Entries and Lines), ensuring that the total balance across all accounts is always zero-sum and auditable.
 \end{itemize}

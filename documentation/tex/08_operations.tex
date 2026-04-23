@@ -22,3 +22,20 @@ cat docker/apply-reversals.sql | docker compose exec -T branch_b_db psql -U admi
 \begin{lstlisting}[style=bash]
 curl http://localhost:4000/health/deep
 \end{lstlisting}
+\subsection{Compliance (KYC) Dashboard}
+The system tracks the Know Your Customer (KYC) status for all users. Statuses include:
+\begin{itemize}
+    \item \textbf{PENDING}: Initial state for new users.
+    \item \textbf{VERIFIED}: User is cleared for full banking operations.
+    \item \textbf{REJECTED}: User is blocked from opening new accounts or transacting.
+\end{itemize}
+These statuses are displayed as visual badges in the \texttt{AccountsTable} on the employee dashboard.
+
+\subsection{Operational Audit Trail}
+Every sensitive action in ByteVault is captured in the \texttt{audit\_logs} table. This includes:
+\begin{itemize}
+    \item Account creations and status changes.
+    \item Transfer requests and approvals.
+    \item Manual ledger adjustments.
+\end{itemize}
+Admin users can view the full history at \texttt{/admin/audit}, which displays the actor UUID, action type, entity involved, and associated metadata.

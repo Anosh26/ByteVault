@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bun --watch index.ts",
     "onboard": "bun scripts/onboard.ts",
+    "seed-demo": "bun scripts/seed_demo.ts",
     "start": "bun run index.ts"
   },
   "devDependencies": {

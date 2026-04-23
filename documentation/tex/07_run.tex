@@ -21,3 +21,20 @@ bun install
 cp .env.example .env.local
 bun run dev
 \end{lstlisting}
+\subsection{Onboarding and Seeding}
+Once the databases and backend are running, you must populate the system with initial records.
+
+\subsubsection{Onboard an Employee}
+To access the employee dashboard, create an admin or maker account:
+\begin{lstlisting}[style=bash]
+cd backend
+bun run onboard --email admin@bytevault.com --password securepass --role ADMIN --branch MAIN --name "Admin User"
+\end{lstlisting}
+
+\subsubsection{Seed Demo Data}
+To quickly populate the system with a sample user, bank account, and audit logs for testing:
+\begin{lstlisting}[style=bash]
+cd backend
+bun run seed-demo
+\end{lstlisting}
+This command creates a verified user (\texttt{john.doe@example.com}) with an active account and an initial balance of ₹50,000.00.
