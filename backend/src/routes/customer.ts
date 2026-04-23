@@ -4,7 +4,7 @@ import { poolA } from '../db.ts';
 import { verifyPassword } from '../utils/password.ts';
 import { signCustomerToken } from '../auth/jwt.ts';
 import { requireCustomerAuth } from '../middleware/auth.ts';
-import { idempotencyMiddleware } from '../middleware/idempotency.ts';
+import { requireIdempotencyKey } from '../middleware/idempotency.ts';
 import { asyncHandler, parseOrThrow } from '../utils/http.ts';
 import { AuditService } from '../services/AuditService.ts';
 
@@ -95,7 +95,7 @@ const transferSchema = z.object({
 customerRouter.post(
   '/transfer',
   requireCustomerAuth,
-  idempotencyMiddleware({ actorType: 'USER' }),
+  requireIdempotencyKey({ actorType: 'USER' }),
   asyncHandler(async (req, res) => {
     const user = req.user!;
     if (user.kycStatus !== 'VERIFIED') {
