@@ -16,7 +16,7 @@ customerRouter.post('/auth/login', asyncHandler(async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
 
   const q = await poolA().query(
-    `SELECT id, email, password_hash, kyc_status
+    `SELECT id, email, password_hash, kyc_status, full_name
      FROM users
      WHERE email = $1`,
     [email],
@@ -37,7 +37,7 @@ customerRouter.post('/auth/login', asyncHandler(async (req, res) => {
   return res.json({
     accessToken: token,
     tokenType: 'Bearer',
-    user: { id: row.id, email: row.email, kycStatus: row.kyc_status },
+    user: { id: row.id, email: row.email, kycStatus: row.kyc_status, fullName: row.full_name },
   });
 }));
 
@@ -79,7 +79,25 @@ customerRouter.get('/dashboard', requireCustomerAuth, asyncHandler(async (req, r
       [user.id]
     );
 
-    res.json({ accounts, recentTransactions: historyRes.rows, kycStatus: user.kycStatus });
+    // 3. Fetch user details (full name)
+    const userRes = await client.query(`SELECT full_name FROM users WHERE id = $1`, [user.id]);
+    
+    // 4. Fetch pending transfers (The Pipeline)
+    const pendingRes = await client.query(
+      `SELECT id, to_account_number, amount, status, created_at
+       FROM transfer_requests
+       WHERE created_by_user_id = $1 AND status = 'PENDING'
+       ORDER BY created_at DESC`,
+      [user.id]
+    );
+
+    res.json({ 
+      accounts, 
+      recentTransactions: historyRes.rows, 
+      kycStatus: user.kycStatus,
+      fullName: userRes.rows[0]?.full_name,
+      pendingTransfers: pendingRes.rows 
+    });
   } finally {
     client.release();
   }

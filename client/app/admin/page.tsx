@@ -139,49 +139,49 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] px-4 py-8 md:px-8">
-      <div className="mx-auto max-w-6xl">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight glow-text">Admin Terminal</h1>
-            <p className="text-slate-500 text-sm font-medium mt-1 uppercase tracking-widest">Internal Ledger Control & Auditing</p>
-          </div>
-          
-          <nav className="flex gap-1 rounded-xl bg-slate-900/50 p-1 border border-white/5">
-            <button
-              onClick={() => setTab('users')}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${tab === 'users' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-            >
-              <Users suppressHydrationWarning className="h-4 w-4" /> Users
-            </button>
-            <button
-              onClick={() => setTab('journal')}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${tab === 'journal' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-            >
-              <FileText suppressHydrationWarning className="h-4 w-4" /> Journal
-            </button>
-            <button
-              onClick={() => setTab('recon')}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${tab === 'recon' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-            >
-              <BarChart3 suppressHydrationWarning className="h-4 w-4" /> Recon
-            </button>
-            <button
-              onClick={() => setTab('batch')}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${tab === 'batch' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-amber-400 hover:bg-white/5'}`}
-            >
-              <Zap suppressHydrationWarning className="h-4 w-4" /> Batch Jobs
-            </button>
-          </nav>
-        </header>
+    <div className="min-h-screen bg-[#020617] flex">
+      {/* Admin Sidebar */}
+      <aside className="w-64 border-r border-white/5 bg-slate-950 flex flex-col shrink-0 sticky top-0 h-screen">
+        <div className="p-6 pb-4">
+          <h1 className="text-lg font-black tracking-tight glow-text">Admin Terminal</h1>
+          <p className="text-[10px] text-slate-600 uppercase tracking-widest font-bold mt-1">Ledger Control & Auditing</p>
+        </div>
 
+        <nav className="px-3 flex-1 space-y-1">
+          <div className="text-[10px] text-slate-600 uppercase tracking-widest font-bold px-3 mb-2">Management</div>
+          {([
+            { key: 'users', label: 'Users', icon: Users, color: 'blue' },
+            { key: 'journal', label: 'Journal', icon: FileText, color: 'blue' },
+            { key: 'recon', label: 'Recon', icon: BarChart3, color: 'blue' },
+            { key: 'batch', label: 'Batch Jobs', icon: Zap, color: 'amber' },
+          ] as const).map(item => {
+            const isActive = tab === item.key;
+            const activeClass = item.color === 'amber'
+              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+              : 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
+            return (
+              <button
+                key={item.key}
+                onClick={() => setTab(item.key)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left ${isActive ? activeClass : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+              >
+                <item.icon suppressHydrationWarning className="w-4 h-4" />
+                <span className="text-sm font-medium">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* Main Content */}
+      <div className="flex-1 p-6 md:p-10 overflow-y-auto min-h-screen">
         {error && (
-          <div className="mt-8 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400 font-medium">
+          <div className="mb-8 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400 font-medium">
             {error}
           </div>
         )}
 
-        <main className="mt-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <main className="animate-in fade-in slide-in-from-bottom-2 duration-500">
           {tab === 'users' && (
             <div className="glass-card overflow-hidden">
                <div className="p-6 border-b border-white/5 flex items-center justify-between">
