@@ -79,7 +79,7 @@ customerRouter.get('/dashboard', requireCustomerAuth, asyncHandler(async (req, r
       [user.id]
     );
 
-    res.json({ accounts, recentTransactions: historyRes.rows });
+    res.json({ accounts, recentTransactions: historyRes.rows, kycStatus: user.kycStatus });
   } finally {
     client.release();
   }

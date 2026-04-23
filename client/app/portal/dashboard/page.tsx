@@ -31,7 +31,7 @@ export default function CustomerDashboard() {
   if (error) return <div className="p-8 text-red-500">{error}</div>;
   if (!data) return <div className="p-8 text-white flex justify-center mt-20"><div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full" /></div>;
 
-  const kycVerified = data.accounts.length > 0; // We'll infer KYC verified if they have accounts for demo, ideally we fetch user.kycStatus
+  const kycVerified = data.kycStatus === 'VERIFIED';
 
   return (
     <div className="min-h-screen bg-slate-950 p-4 md:p-8">
@@ -105,22 +105,48 @@ export default function CustomerDashboard() {
           </div>
 
           <div className="space-y-6">
+            {data.kycStatus !== 'VERIFIED' && (
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 flex gap-3 items-start">
+                <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-amber-400 font-bold text-sm">Action Required</h4>
+                  <p className="text-amber-500/80 text-xs mt-1 leading-relaxed">
+                    Your KYC status is currently {data.kycStatus}. Please visit your nearest branch to verify your identity. Outbound transfers are disabled.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="glass-card p-6">
               <h3 className="text-white font-bold mb-4">Quick Actions</h3>
-              <Link 
-                href={`/portal/transfer?accountId=${data.accounts[0]?.id}`}
-                className="flex items-center justify-between p-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400 group-hover:scale-110 transition-transform">
-                    <ArrowRightLeft className="w-5 h-5" />
+              {data.kycStatus === 'VERIFIED' ? (
+                <Link 
+                  href={`/portal/transfer?accountId=${data.accounts[0]?.id}`}
+                  className="flex items-center justify-between p-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400 group-hover:scale-110 transition-transform">
+                      <ArrowRightLeft className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-emerald-400 font-bold">Send Money</div>
+                      <div className="text-emerald-500/70 text-xs">Transfer to any branch</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-emerald-400 font-bold">Send Money</div>
-                    <div className="text-emerald-500/70 text-xs">Transfer to any branch</div>
+                </Link>
+              ) : (
+                <div className="flex items-center justify-between p-4 bg-slate-800/50 border border-white/5 rounded-xl opacity-50 cursor-not-allowed">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-slate-700/50 rounded-lg text-slate-500">
+                      <ArrowRightLeft className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-slate-400 font-bold">Send Money</div>
+                      <div className="text-slate-500 text-xs">Transfers locked (KYC)</div>
+                    </div>
                   </div>
                 </div>
-              </Link>
+              )}
             </div>
           </div>
         </div>
