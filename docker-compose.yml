@@ -48,6 +48,39 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build: ./backend
+    container_name: bytevault_backend
+    restart: unless-stopped
+    depends_on:
+      branch_a_db:
+        condition: service_healthy
+      branch_b_db:
+        condition: service_healthy
+    environment:
+      - BRANCH_A_DB_URL=postgresql://admin_a:secure_password_a@branch_a_db:5432/branch_a_db
+      - BRANCH_B_DB_URL=postgresql://admin_b:secure_password_b@branch_b_db:5432/branch_b_db
+      - JWT_SECRET=super_secret_dev_key
+      - PORT=4000
+    ports:
+      - "4000:4000"
+    networks:
+      - bytevault_net
+
+  client:
+    build:
+      context: ./client
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:4000
+    container_name: bytevault_client
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    networks:
+      - bytevault_net
+
 networks:
   bytevault_net:
     driver: bridge

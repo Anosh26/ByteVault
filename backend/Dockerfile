@@ -1,15 +1,19 @@
-FROM oven/bun:1-alpine
+FROM oven/bun:latest
 
 WORKDIR /app
 
-COPY package.json bun.lock* ./
+# Copy package files
+COPY package.json ./
+COPY bun.lockb ./
+
+# Install dependencies
 RUN bun install --frozen-lockfile
 
-COPY tsconfig.json ./
-COPY index.ts ./
-COPY src ./src
+# Copy source code
+COPY . .
 
-ENV NODE_ENV=production
+# Expose the API port
 EXPOSE 4000
 
+# Start the server
 CMD ["bun", "run", "index.ts"]
