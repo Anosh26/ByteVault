@@ -10,6 +10,7 @@ type UserRow = {
   id: string;
   email: string;
   phone: string;
+  pan_card: string | null;
   full_name: string;
   kyc_status: string;
   total_balance: string;
@@ -51,7 +52,7 @@ export default function AdminPage() {
 
   // Add User Form State
   const [showAddUser, setShowAddUser] = useState(false);
-  const [newUser, setNewUser] = useState({ fullName: '', email: '', phone: '', password: '' });
+  const [newUser, setNewUser] = useState({ fullName: '', email: '', phone: '', panCard: '', password: '' });
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -148,7 +149,7 @@ export default function AdminPage() {
     try {
       await api.post('/api/users', newUser);
       setShowAddUser(false);
-      setNewUser({ fullName: '', email: '', phone: '', password: '' });
+      setNewUser({ fullName: '', email: '', phone: '', panCard: '', password: '' });
       void loadUsers();
     } catch (e: any) {
       alert(e.response?.data?.error || 'Failed to create user');
@@ -243,7 +244,7 @@ export default function AdminPage() {
                          <td className="px-6 py-4 font-bold text-white">{u.full_name}</td>
                          <td className="px-6 py-4">
                            <div className="text-slate-300">{u.email}</div>
-                           <div className="text-[10px] text-slate-500 font-mono">{u.phone}</div>
+                           <div className="text-[10px] text-slate-500 font-mono">{u.phone} {u.pan_card ? `• PAN: ${u.pan_card}` : ''}</div>
                          </td>
                          <td className="px-6 py-4">
                            <div className="flex items-center gap-2">
@@ -500,6 +501,17 @@ export default function AdminPage() {
                   onChange={e => setNewUser({ ...newUser, phone: e.target.value })}
                   className="w-full bg-slate-900 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"
                   placeholder="+91 ..."
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">PAN Card (Optional)</label>
+                <input
+                  type="text"
+                  maxLength={10}
+                  value={newUser.panCard}
+                  onChange={e => setNewUser({ ...newUser, panCard: e.target.value.toUpperCase() })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+                  placeholder="ABCDE1234F"
                 />
               </div>
               <div>

@@ -9,6 +9,7 @@ export const usersRouter = express.Router();
 const createUserSchema = z.object({
   email: z.string().email(),
   phone: z.string().min(3).max(30),
+  panCard: z.string().length(10).optional(),
   fullName: z.string().min(2).max(150),
   password: z.string().min(6).optional(),
 });
@@ -28,10 +29,10 @@ usersRouter.post(
       await client.query('BEGIN');
       
       const userQ = await client.query(
-        `INSERT INTO users (email, phone, password_hash, full_name, kyc_status)
-         VALUES ($1, $2, $3, $4, 'PENDING')
-         RETURNING id, email, phone, full_name, kyc_status, created_at`,
-        [body.email, body.phone, hashedPassword, body.fullName],
+        `INSERT INTO users (email, phone, pan_card, password_hash, full_name, kyc_status)
+         VALUES ($1, $2, $3, $4, $5, 'PENDING')
+         RETURNING id, email, phone, pan_card, full_name, kyc_status, created_at`,
+        [body.email, body.phone, body.panCard || null, hashedPassword, body.fullName],
       );
       const user = userQ.rows[0];
 
@@ -62,7 +63,7 @@ usersRouter.get(
     const offset = Math.max(Number(req.query.offset ?? 0) || 0, 0);
 
     const q = await poolA().query(
-      `SELECT u.id, u.email, u.phone, u.full_name, u.kyc_status, u.created_at,
+      `SELECT u.id, u.email, u.phone, u.pan_card, u.full_name, u.kyc_status, u.created_at,
               COALESCE(SUM(a.balance), 0)::numeric AS total_balance,
               COUNT(a.id)::int AS account_count
        FROM users u
@@ -82,7 +83,7 @@ usersRouter.get(
   asyncHandler(async (req, res) => {
     const id = req.params.id;
     const q = await poolA().query(
-      `SELECT id, email, phone, full_name, kyc_status, created_at
+      `SELECT id, email, phone, pan_card, full_name, kyc_status, created_at
        FROM users
        WHERE id = $1`,
       [id],
