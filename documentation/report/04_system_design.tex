@@ -13,14 +13,23 @@ The relational schema enforces strict integrity.
     \item \textbf{Audit Logs:} Time-series records of all system actions.
 \end{itemize}
 
-\begin{landscape}
 \begin{figure}[p]
-    \centering
-    \includegraphics[width=1.2\linewidth,height=0.8\textheight,keepaspectratio]{figures/ERD.png}
-    \caption{ByteVault Entity Relationship Diagram (ERD)}
-    \label{fig:erd}
+    \thispagestyle{empty} 
+    \begin{tikzpicture}[remember picture, overlay]
+        \node[rotate=-90, inner sep=0pt, anchor=center] at (current page.center) {
+            \begin{minipage}{\paperheight}
+                \centering
+                \includegraphics[width=0.95\paperheight, height=0.85\paperwidth, keepaspectratio]{figures/ERD.png}
+                
+                \vspace{0.5cm} 
+                
+                
+                \captionof{figure}{ByteVault Entity Relationship Diagram (ERD)}
+                \label{fig:erd}
+            \end{minipage}
+        };
+    \end{tikzpicture}
 \end{figure}
-\end{landscape}
 
 \section{Security Aspects}
 \begin{itemize}
