@@ -1,20 +1,57 @@
 \chapter{Output Screens}
 
-This section reserves space for screenshots demonstrating the functional system.
+This section contains screenshots demonstrating the functional ByteVault system, including the user interface and core database operations.
 
 \section{User Interface}
-\textit{(Attach screenshots here)}
-\begin{itemize}
-    \item Employee Login Screen
-    \item Maker Dashboard (showing KYC statuses and account balances)
-    \item Checker Approval Queue
-    \item Admin Audit Trail Dashboard
-\end{itemize}
 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/login_employee.png}
+    \caption{Employee Login Screen}
+    \label{fig:login_employee}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/maker_dash.png}
+    \caption{Maker Dashboard - Overview of branch accounts}
+    \label{fig:maker_dash}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/checker_dash.png}
+    \caption{Checker Approval Queue - Pending transaction authorizations}
+    \label{fig:checker_dash}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.8\linewidth]{figures/admin_audit.png}
+    \caption{Admin Audit Trail - High-level system event monitoring}
+    \label{fig:admin_audit}
+\end{figure}
+
+\newpage
 \section{Database \& Schema Queries}
-\textit{(Attach screenshots here)}
-\begin{itemize}
-    \item Output of \texttt{SELECT * FROM journal\_lines;} showing balanced entries.
-    \item Output of the \texttt{audit\_logs} table demonstrating rich JSON metadata tracking.
-    \item Output showing the FDW mapping in the Main database.
-\end{itemize}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.0\linewidth]{figures/journal_entries.png}
+    \caption{Balanced Journal Entries - Showing double-entry integrity}
+    \label{fig:journal_entries}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.0\linewidth]{figures/audit_logs.png}
+    \caption{Audit Logs - Detailed JSON metadata tracking for security}
+    \label{fig:audit_logs}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1.0\linewidth]{figures/fdw_mapping.png}
+    \caption{Foreign Data Wrapper (FDW) - Main database mapping tables from Sub branch}
+    \label{fig:fdw_mapping}
+\end{figure}
