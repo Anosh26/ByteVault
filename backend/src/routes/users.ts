@@ -64,7 +64,8 @@ usersRouter.get(
     const q = await poolA().query(
       `SELECT u.id, u.email, u.phone, u.pan_card, u.full_name, u.kyc_status, u.created_at,
               COALESCE(SUM(a.balance), 0)::numeric AS total_balance,
-              COUNT(a.id)::int AS account_count
+              COUNT(a.id)::int AS account_count,
+              STRING_AGG(a.account_number, ', ') AS account_numbers
        FROM users u
        LEFT JOIN accounts a ON a.user_id = u.id
        GROUP BY u.id

@@ -15,6 +15,7 @@ type UserRow = {
   kyc_status: string;
   total_balance: string;
   account_count: number;
+  account_numbers: string | null;
   created_at: string;
 };
 
@@ -261,7 +262,10 @@ export default function AdminPage() {
                          </td>
                          <td className="px-6 py-4 text-right">
                            <span className="font-mono font-bold text-white">{formatInr(Number(u.total_balance))}</span>
-                           <div className="text-[10px] text-slate-500">{u.account_count} account{u.account_count !== 1 ? 's' : ''}</div>
+                           <div className="text-[10px] text-slate-500">
+                             {u.account_count} account{u.account_count !== 1 ? 's' : ''} 
+                             {u.account_numbers ? ` • ${u.account_numbers}` : ''}
+                           </div>
                          </td>
                          <td className="px-6 py-4 text-right text-slate-500 text-xs">{new Date(u.created_at).toLocaleDateString()}</td>
                        </tr>
