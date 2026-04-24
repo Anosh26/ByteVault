@@ -6,98 +6,110 @@
 
 ---
 
-## Preparation Checklist (Before the Presentation)
-* [ ] Run `bun run dev` to ensure backend and frontend are live.
-* [ ] Run `bun run seed-demo` (optional) to ensure you have some dummy data.
-* [ ] Open three browser tabs:
-    1. **Admin Terminal:** `http://localhost:3000/login`
-    2. **Customer Portal:** `http://localhost:3000/portal/login`
-    3. **PostgreSQL Client (DBeaver/pgAdmin):** Connected to `branch_a_db` (MAIN) to show raw database tables.
+## 🛠️ Preparation Checklist (Before the Presentation)
+
+1. **Environment Setup:**
+   * [ ] Ensure Docker is running.
+   * [ ] Run `npm run db` (or `docker compose up -d`) to start both Branch A and Branch B databases.
+   * [ ] Run `npm run dev` to start the backend and Next.js frontend.
+   * [ ] Run `npm run seed` to populate initial demo users.
+
+2. **Onboard Demo Employees (If not already present):**
+   * [ ] **Maker:** `cd backend && bun scripts/onboard.ts --email maker@bank.com --password makerpass --role MAKER --branch MAIN --name "Alice Maker"`
+   * [ ] **Checker:** `cd backend && bun scripts/onboard.ts --email checker@bank.com --password checkerpass --role CHECKER --branch MAIN --name "Bob Checker"`
+   * [ ] **Admin:** `cd backend && bun scripts/onboard.ts --email admin@bank.com --password adminpass --role ADMIN --branch MAIN --name "System Admin"`
+
+3. **Open Browser Tabs:**
+   1. **Admin/Employee Terminal:** `http://localhost:3000/login`
+   2. **Customer Portal:** `http://localhost:3000/portal/login`
+   3. **DBeaver / pgAdmin:** Connected to `branch_a_db` (MAIN).
 
 ---
 
 ## 1. Introduction & The "Hook" (1-2 mins)
 
 **What to say:**
-> "Hello Professor. Today I will be presenting **ByteVault**, an enterprise-grade banking system. Most student projects build simple CRUD applications with a single database. ByteVault is different. It is a **Distributed Ledger System** designed to handle complex financial operations across multiple branches. 
+> "Hello Professor. Today I will be presenting **ByteVault**, an enterprise-grade banking system. 
+> Unlike typical CRUD projects, ByteVault is a **Distributed Ledger System** designed for high-integrity financial operations across multiple branches.
 > 
 > The core challenges I solved in this project are:
-> 1. Ensuring zero money is lost when transferring funds between two completely separate databases.
-> 2. Enforcing strict Role-Based Access Control (RBAC) using a Maker-Checker approval pipeline.
-> 3. Maintaining an immutable Double-Entry Accounting ledger for financial integrity."
+> 1. **Data Consistency:** Implementing a Two-Phase Commit (2PC) protocol to prevent money loss during cross-database transfers.
+> 2. **Security & Governance:** Enforcing a strict Maker-Checker approval pipeline to prevent internal fraud.
+> 3. **Observability:** Building an immutable Double-Entry Ledger and a rich Audit Trail with JSON metadata."
 
 ---
 
-## 2. Phase 1: Onboarding & The KYC Gateway (3 mins)
+## 2. Phase 1: Onboarding & The KYC Gateway (2 mins)
 
-**Action 1:** Open the **Admin Terminal** and log in as an `ADMIN` (e.g., `admin@bytevault.com`).
-**Action 2:** Navigate to the **Users** tab. Click **"Register Customer"** and create a new user (e.g., "Demo User").
+**Action 1:** Log in to **Admin Terminal** as `admin@bank.com`.
+**Action 2:** Navigate to **Users** tab. Show the "Pending" status of a user.
 **What to say:**
-> "Let's start with customer onboarding. In a real bank, customers don't just sign up; they are onboarded by employees. When I create this user, the system automatically provisions a unique ledger identity and a default savings account at the Main branch."
+> "In ByteVault, security starts at onboarding. We don't have public sign-ups. Customers are registered by bank employees.
+> Notice that a newly created user has a `PENDING` KYC status. Our security middleware blocks all transaction capabilities until a physical document verification is performed by the back-office."
 
-**Action 3:** Switch to the **Customer Portal** tab and log in as the newly created user.
-**What to say:**
-> "Notice the warning banner and the disabled 'Send Money' button. This is the **KYC Gateway**. By default, new accounts are in a `PENDING` state. Security middleware prevents them from initiating transactions until the bank verifies their physical documents."
-
-**Action 4:** (Behind the scenes or via DB) Update the user's KYC to `VERIFIED`. Refresh the Customer Portal to show the button is now active.
+**Action 3:** Click **"Verify"** on a pending user.
+**Action 4:** Log in as that user in the **Customer Portal**. Show that the "Send Money" button is now active.
 
 ---
 
-## 3. Phase 2: The Maker-Checker Flow & Holds (4 mins)
+## 3. Phase 2: The Maker-Checker Workflow (3 mins)
 
-**Action 1:** In the Customer Portal, initiate a transfer of ₹500 to another account (ensure the destination account is in the `SUB` branch).
+**Action 1:** Log in to the **Admin Terminal** as **Alice Maker** (`maker@bank.com`).
+**Action 2:** Navigate to the **Maker Dashboard**. Show the list of accounts.
 **What to say:**
-> "I'm initiating a transfer to a different branch. However, the money doesn't move immediately. Enterprise systems require oversight. The request is now `PENDING`."
+> "I am now logged in as a 'Maker'. This is a clerk-level role. I can initiate requests but I cannot authorize them myself. This follows the **'Four-Eyes Principle'** mandatory in global banking."
 
-**Action 2:** Switch to the **Admin Terminal** and open the **PostgreSQL Client**. Query the `account_holds` table.
+**Action 3:** Initiate a transfer from a customer account. Note that it stays in `PENDING_APPROVAL` status.
+**Action 4:** Open your SQL Client and run: `SELECT * FROM account_holds;`
 **What to say:**
-> "To prevent the user from spending that ₹500 twice before the transfer is approved, the system places a **Hold** on the funds. The available balance decreases, but the ledger balance remains untouched. This is critical to prevent race conditions and overdrafts."
+> "Notice that the money hasn't moved in the ledger yet, but we have an **Account Hold**. The available balance for the user has decreased, preventing them from double-spending, while the funds remain safely in the account until a Checker approves the release."
 
-**Action 3:** In the Admin Terminal, navigate to the transfers/approvals section (or explain the API if UI is pending).
+**Action 5:** Switch/Log in as **Bob Checker** (`checker@bank.com`).
+**Action 6:** Show the **Checker Approval Queue**.
 **What to say:**
-> "Now, an employee with a `CHECKER` or `MANAGER` role reviews this. We strictly enforce the 'Four-Eyes Principle'—the person who initiated the request (the Maker) cannot be the same person who approves it."
-
-**Action 4:** Approve the transaction.
+> "As Bob, the Checker, I can see the pending request. I can see the audit metadata—who created it, when, and the risk score. Once I approve this, the system will trigger the ledger movement."
 
 ---
 
-## 4. Phase 3: The Distributed Ledger & 2PC (3 mins)
+## 4. Phase 3: Distributed Ledger & 2PC (3 mins)
 
-**Action 1:** Show the **Journal** tab in the Admin Dashboard. Point out the balanced lines (Debit and Credit).
+**Action 1:** Approve the transfer in the Checker queue.
+**Action 2:** Switch to the **Journal** tab in the Admin Dashboard.
 **What to say:**
-> "When the Checker approved that transaction, it triggered a cross-branch transfer. This is where the technical complexity peaks. The sender is in `branch_a_db` and the receiver is in `branch_b_db`. 
+> "When the Checker approved that transaction, it triggered a cross-branch transfer. The sender is in `branch_a_db` and the receiver is in `branch_b_db`. 
 > 
 > To ensure ACID compliance across two physical servers, I implemented the **Two-Phase Commit (2PC) protocol**. 
-> 1. The backend tells both databases to `PREPARE` the transaction. They lock the rows and write to disk.
-> 2. If, and only if, both databases reply 'Ready', the backend issues a `COMMIT PREPARED`.
+> 1. The backend issues `PREPARE TRANSACTION` to both databases. They lock the rows and write to the WAL.
+> 2. If both reply 'OK', we issue `COMMIT PREPARED`.
 > 
-> If the network drops or a database crashes during this process, the system issues a `ROLLBACK PREPARED`. This guarantees money is never lost in transit."
+> This guarantees that money is never 'lost in transit' due to a network or database failure."
+
+**Action 3:** Show the balanced lines in the Journal. Point out the `CLEARING_INTERBRANCH` account entries.
+**What to say:**
+> "Notice the double-entry accounting. For every debit in Branch A, there is a corresponding credit in Branch B, bridged by an internal clearing account."
 
 ---
 
-## 5. Phase 4: Reversals & Batch Processing (3 mins)
+## 5. Phase 4: Compliance, Audit & FDW (3 mins)
 
-**Action 1:** Still in the **Journal** tab, click **"Reverse"** on a recent transaction.
+**Action 1:** Navigate to the **Audit Trail** (`/admin/audit`).
+**Action 2:** Click on a log entry to show the **JSON Metadata**.
 **What to say:**
-> "Financial data must be immutable. If fraud occurs, we don't `DELETE` rows. I built an automated Reversal engine. It creates a new, inverse journal entry that perfectly cancels out the fraudulent one, preserving the audit trail."
+> "Every single action in ByteVault is recorded in an immutable Audit Log. We don't just store 'who' and 'when'. We store the full request context, including IP addresses and old/new value snapshots. This is critical for forensic accounting."
 
-**Action 2:** Go to the **Batch Jobs** tab in the Admin UI.
+**Action 3:** Show the **Recon** tab. Show that internal accounts net to zero.
 **What to say:**
-> "Finally, let's look at the End of Day (EOD) engine. 
-> When I run EOD, the system does three things:
-> 1. It audits the `CLEARING_INTERBRANCH` ledger. If the net balance across branches isn't exactly ₹0.00, it aborts and alerts us of a critical ledger drift.
-> 2. It scans for accounts in a `FROZEN` state for compliance reporting.
-> 3. It calculates a daily 4% interest accrual for all active accounts without moving money."
+> "Our End-of-Day engine performs an automated reconciliation. It scans the entire ledger to ensure that all internal clearing accounts net to exactly zero. If there's even a 1-paise drift, the system raises a compliance alert."
 
-**Action 3:** Click **"Run EOM Interest Posting"**.
+**Action 4: (Technical Highlight)** Open your SQL client and show the **Foreign Data Wrapper (FDW)** view.
 **What to say:**
-> "At the End of the Month, the EOM job aggregates all those daily accruals and posts massive batch journal entries, debiting the bank's Interest Expense account and crediting the customers."
+> "Finally, a technical highlight: To allow the MAIN branch to monitor the SUB branch without manual exports, I implemented **PostgreSQL Foreign Data Wrappers**. This allows the MAIN database to query SUB branch tables in real-time as if they were local, while maintaining physical data isolation."
 
 ---
 
 ## 6. Conclusion & Q&A (1 min)
 
 **What to say:**
-> "To summarize, ByteVault goes beyond standard web development by tackling distributed state management, strict concurrency controls (holds and 2PC), and immutable financial accounting. 
+> "In summary, ByteVault demonstrates engineering for correctness, not just features. From 2PC for distributed state to Maker-Checker for governance, it is built to the standards of a real-world financial system. 
 > 
-> I am happy to take any questions on the database schema, the API architecture, or the security implementations."
+> Thank you, and I'm ready for your questions."
