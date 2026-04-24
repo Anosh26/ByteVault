@@ -504,9 +504,12 @@ export default function AdminPage() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">PAN Card (Optional)</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">PAN Card</label>
                 <input
                   type="text"
+                  required
+                  pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}"
+                  title="Indian PAN format (e.g., ABCDE1234F)"
                   maxLength={10}
                   value={newUser.panCard}
                   onChange={e => setNewUser({ ...newUser, panCard: e.target.value.toUpperCase() })}
@@ -515,9 +518,10 @@ export default function AdminPage() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Password (Optional)</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Password</label>
                 <input
                   type="password"
+                  required
                   value={newUser.password}
                   onChange={e => setNewUser({ ...newUser, password: e.target.value })}
                   className="w-full bg-slate-900 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"

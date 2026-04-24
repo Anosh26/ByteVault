@@ -112,14 +112,22 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-8 pt-8 border-t border-white/5 flex items-center justify-center gap-6">
-            <div className="flex flex-col items-center gap-1.5">
-               <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-               <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">System Ready</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all cursor-help">
-               <Shield suppressHydrationWarning className="h-3 w-3 text-blue-500" />
-               <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">2PC Enforced</span>
+          <div className="mt-8 pt-8 border-t border-white/5 flex flex-col items-center justify-center gap-6">
+            <button
+              onClick={() => router.push('/portal/login')}
+              className="text-xs font-bold text-slate-400 hover:text-white transition-colors"
+            >
+              Are you a customer? Go to Customer Portal →
+            </button>
+            <div className="flex items-center gap-6">
+              <div className="flex flex-col items-center gap-1.5">
+                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                 <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">System Ready</span>
+              </div>
+              <div className="flex flex-col items-center gap-1.5 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all cursor-help">
+                 <Shield suppressHydrationWarning className="h-3 w-3 text-blue-500" />
+                 <span className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">2PC Enforced</span>
+              </div>
             </div>
           </div>
         </div>

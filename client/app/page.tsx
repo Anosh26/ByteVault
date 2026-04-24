@@ -11,7 +11,7 @@ export default function RootPage() {
     if (token) {
       router.push('/dashboard');
     } else {
-      router.push('/login');
+      router.push('/portal/login');
     }
   }, [router]);
 

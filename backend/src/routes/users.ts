@@ -9,9 +9,9 @@ export const usersRouter = express.Router();
 const createUserSchema = z.object({
   email: z.string().email(),
   phone: z.string().min(3).max(30),
-  panCard: z.string().length(10).optional(),
+  panCard: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid Indian PAN Card format"),
   fullName: z.string().min(2).max(150),
-  password: z.string().min(6).optional(),
+  password: z.string().min(6),
 });
 
 usersRouter.post(
@@ -21,8 +21,7 @@ usersRouter.post(
   asyncHandler(async (req, res) => {
     const { hashPassword } = require('../utils/password.ts');
     const body = parseOrThrow(createUserSchema, req.body);
-    const password = body.password || 'securepass'; // Default for demo if not provided
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = await hashPassword(body.password);
 
     const client = await poolA().connect();
     try {
@@ -32,7 +31,7 @@ usersRouter.post(
         `INSERT INTO users (email, phone, pan_card, password_hash, full_name, kyc_status)
          VALUES ($1, $2, $3, $4, $5, 'PENDING')
          RETURNING id, email, phone, pan_card, full_name, kyc_status, created_at`,
-        [body.email, body.phone, body.panCard || null, hashedPassword, body.fullName],
+        [body.email, body.phone, body.panCard, hashedPassword, body.fullName],
       );
       const user = userQ.rows[0];
 

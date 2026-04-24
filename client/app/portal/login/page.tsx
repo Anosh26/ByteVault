@@ -87,6 +87,15 @@ export default function CustomerLogin() {
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>
         </form>
+
+        <div className="mt-8 pt-6 border-t border-white/5 flex flex-col items-center justify-center">
+          <button
+            onClick={() => router.push('/login')}
+            className="text-xs font-bold text-slate-400 hover:text-white transition-colors"
+          >
+            Are you an employee? Go to Staff Login →
+          </button>
+        </div>
       </div>
     </div>
   );
