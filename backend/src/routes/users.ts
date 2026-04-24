@@ -12,6 +12,7 @@ const createUserSchema = z.object({
   panCard: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid Indian PAN Card format"),
   fullName: z.string().min(2).max(150),
   password: z.string().min(6),
+  branchName: z.enum(['MAIN', 'SUB']).optional().default('MAIN'),
 });
 
 usersRouter.post(
@@ -39,8 +40,8 @@ usersRouter.post(
       const account_number = Math.floor(10000 + Math.random() * 90000).toString();
       await client.query(
         `INSERT INTO accounts (user_id, branch_id, account_number, balance, status)
-         VALUES ($1, (SELECT id FROM branches WHERE name = 'MAIN' LIMIT 1), $2, 0, 'ACTIVE')`,
-        [user.id, account_number]
+         VALUES ($1, (SELECT id FROM branches WHERE branch_code = $3 LIMIT 1), $2, 0, 'ACTIVE')`,
+        [user.id, account_number, body.branchName]
       );
 
       await client.query('COMMIT');

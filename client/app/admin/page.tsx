@@ -53,7 +53,7 @@ export default function AdminPage() {
 
   // Add User Form State
   const [showAddUser, setShowAddUser] = useState(false);
-  const [newUser, setNewUser] = useState({ fullName: '', email: '', phone: '', panCard: '', password: '' });
+  const [newUser, setNewUser] = useState({ fullName: '', email: '', phone: '', panCard: '', password: '', branchName: 'MAIN' });
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -150,7 +150,7 @@ export default function AdminPage() {
     try {
       await api.post('/api/users', newUser);
       setShowAddUser(false);
-      setNewUser({ fullName: '', email: '', phone: '', panCard: '', password: '' });
+      setNewUser({ fullName: '', email: '', phone: '', panCard: '', password: '', branchName: 'MAIN' });
       void loadUsers();
     } catch (e: any) {
       alert(e.response?.data?.error || 'Failed to create user');
@@ -540,6 +540,17 @@ export default function AdminPage() {
                   className="w-full bg-slate-900 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"
                   placeholder="Leave blank for 'securepass'"
                 />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Assigned Branch</label>
+                <select
+                  value={newUser.branchName}
+                  onChange={e => setNewUser({ ...newUser, branchName: e.target.value })}
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="MAIN">Mumbai (MAIN)</option>
+                  <option value="SUB">Goa (SUB)</option>
+                </select>
               </div>
               
               <div className="flex gap-3 mt-8">
