@@ -345,11 +345,11 @@ export default function AdminPage() {
               <div className="glass-card p-6 flex flex-wrap items-end gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1"><Calendar suppressHydrationWarning className="h-3 w-3" /> Start Date</label>
-                  <input type="date" className="input-field max-w-[200px]" value={startDate} onChange={setStartDate} />
+                  <input type="date" className="input-field max-w-[200px]" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1"><Calendar suppressHydrationWarning className="h-3 w-3" /> End Date</label>
-                  <input type="date" className="input-field max-w-[200px]" value={endDate} onChange={setEndDate} />
+                  <input type="date" className="input-field max-w-[200px]" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                 </div>
                 <button onClick={() => void loadRecon()} className="btn-primary flex items-center gap-2 h-11 px-8"><BarChart3 suppressHydrationWarning className="h-4 w-4" /> Run Reconciliation</button>
               </div>
