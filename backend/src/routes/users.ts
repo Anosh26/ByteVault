@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { poolA } from '../db.ts';
 import { requireEmployeeAuth, requireEmployeeRole } from '../middleware/auth.ts';
 import { asyncHandler, parseOrThrow } from '../utils/http.ts';
+import { hashPassword } from '../utils/password.ts';
 
 export const usersRouter = express.Router();
 
@@ -20,7 +21,6 @@ usersRouter.post(
   requireEmployeeAuth,
   requireEmployeeRole('MAKER', 'MANAGER', 'ADMIN'),
   asyncHandler(async (req, res) => {
-    const { hashPassword } = require('../utils/password.ts');
     const body = parseOrThrow(createUserSchema, req.body);
     const hashedPassword = await hashPassword(body.password);
 

@@ -44,8 +44,8 @@ transfersRouter.post(
     let insertId, insertStatus, insertCreatedAt;
     try {
       await client.query('BEGIN');
-      await client.query('SELECT 1 FROM accounts WHERE id = $1 FOR UPDATE', [from.accountId]);
-      const available = await getAvailableCustomerBalanceCents({ client, accountId: from.accountId });
+      await client.query('SELECT 1 FROM accounts WHERE id = $1 FOR UPDATE', [from.id]);
+      const available = await getAvailableCustomerBalanceCents({ client, accountId: from.id });
       if (available.availableCents < amountCents) {
         throw new Error('Insufficient funds');
       }
@@ -53,7 +53,7 @@ transfersRouter.post(
       const holdRes = await client.query(
         `INSERT INTO account_holds (account_id, amount_cents, reason, status)
          VALUES ($1, $2, 'Transfer Request', 'ACTIVE') RETURNING id`,
-        [from.accountId, amountCents]
+        [from.id, amountCents]
       );
 
       const insertRes = await client.query(
@@ -63,7 +63,7 @@ transfersRouter.post(
            amount, hold_id, status
          ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')
          RETURNING id, status, created_at`,
-        [emp.id, from.accountId, toAccountNumber, to.accountId, amount, holdRes.rows[0].id],
+        [emp.id, from.id, toAccountNumber, to.id, amount, holdRes.rows[0].id],
       );
       
       insertId = insertRes.rows[0].id;

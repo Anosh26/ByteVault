@@ -1,6 +1,6 @@
 export class AppError extends Error {
   constructor(
-    public message: string,
+    public override message: string,
     public status: number = 400,
     public code?: string,
     public details?: unknown

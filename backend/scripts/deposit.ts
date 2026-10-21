@@ -6,10 +6,13 @@ const args = Bun.argv.slice(2);
 const params: Record<string, string> = {};
 
 for (let i = 0; i < args.length; i++) {
-  if (args[i].startsWith("--")) {
-    const key = args[i].slice(2);
+  const arg = args[i];
+  if (arg && arg.startsWith("--")) {
+    const key = arg.slice(2);
     const value = args[++i];
-    params[key] = value;
+    if (value !== undefined) {
+      params[key] = value;
+    }
   }
 }
 
