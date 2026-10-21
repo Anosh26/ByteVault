@@ -3,7 +3,7 @@
 \section{Business Requirement Document (BRD) Summary}
 The system must support the following core business functions:
 \begin{itemize}
-    \item \textbf{User Management:} Onboarding customers with KYC statuses (PENDING, VERIFIED, REJECTED).
+    \item \textbf{User Management:} Customer onboarding with KYC statuses (\texttt{PENDING}, \texttt{VERIFIED}, \texttt{REJECTED}).
     \item \textbf{Ledger Operations:} All fund movements must balance to zero.
     \item \textbf{Transfer Approval:} Employees with the 'MAKER' role initiate transfers, which must be approved by a 'CHECKER'.
     \item \textbf{Auditability:} Every sensitive action must be immutably recorded in a centralized audit trail.
@@ -17,7 +17,7 @@ Many legacy banking simulations rely on a single central database for all transa
 \begin{itemize}
     \item \textbf{Database:} 2x PostgreSQL 16 Instances (simulating Main and Sub branches)
     \item \textbf{Backend:} Bun runtime (v1.x), Express.js, TypeScript
-    \item \textbf{Frontend:} Next.js 14, React, TailwindCSS
+    \item \textbf{Frontend:} Next.js 16 (App Router), React 19, TailwindCSS v4
     \item \textbf{Containerization:} Docker Desktop (for orchestrating the dual database setup)
 \end{itemize}
 

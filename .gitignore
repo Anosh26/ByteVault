@@ -52,3 +52,12 @@ coverage/
 
 # PostgreSQL local data (if bind-mounted outside Docker named volumes)
 **/pgdata/
+
+# LaTeX build artifacts
+*.aux
+*.out
+*.toc
+*.log
+*.synctex.gz
+*.fls
+*.fdb_latexmk

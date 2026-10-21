@@ -9,6 +9,7 @@
 \usepackage{enumitem}
 \usepackage{longtable}
 \usepackage{booktabs}
+\usepackage{amsmath}
 
 \hypersetup{
   colorlinks=true,
@@ -38,6 +39,13 @@
   frame=single,
   backgroundcolor=\color{gray!5}
 }
+\lstdefinestyle{typescript}{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  backgroundcolor=\color{gray!5}
+}
 
 \title{\textbf{ByteVault Project Documentation}}
 \author{ByteVault Team}
@@ -57,6 +65,7 @@
 \input{05_layout}
 \input{06_databases}
 \input{07_backend}
+\input{07_run}
 \input{08_ledger}
 \input{09_security}
 \input{10_operations}
