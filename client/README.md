@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ByteVault Client (Next.js 16 + React 19 + Tailwind CSS)
 
-## Getting Started
+The frontend client for the **ByteVault** Distributed Banking System. It provides two distinct, role-separated web applications: the **Customer Portal** and the **Employee / Admin Terminal**.
 
-First, run the development server:
+---
+
+## 🚀 Portals & Core Routes
+
+### 1. Customer Banking Portal (`/portal/*`)
+* **`/portal/login`**: Customer authentication gateway using email and password.
+* **`/portal/dashboard`**: Primary customer overview displaying available balance, account holds, recent transactions, and the **Pending Transfer Pipeline** sidebar.
+* **`/portal/transfer`**: Client-side transfer interface with real-time balance validation and KYC gateway checks.
+* **`/portal/history`**: Comprehensive journal transaction history for customer accounts.
+
+### 2. Employee Workspace (`/*`)
+* **`/login`**: Staff authentication for Bank Makers, Checkers, Managers, and Admins.
+* **`/dashboard`**: Unified employee console:
+  * **Maker View**: Create new accounts, initiate branch transfers, place funds on hold.
+  * **Checker View**: Review pending transfer authorization queue with 1-click **Approve** (triggers 2PC across databases) or **Reject** (releases hold).
+
+### 3. Admin Terminal (`/admin/*`)
+* **`/admin`**: Master banking control suite:
+  * **Customers Tab**: Full customer registry with inline 1-click **KYC Verification** (`VERIFIED` / `REJECTED`) and customer onboarding modal.
+  * **Journal Tab**: Double-entry general ledger journal entries with immutable **Fraud Reversals**.
+  * **Recon Tab**: Automated multi-branch clearing account reconciliation (`CLEARING_INTERBRANCH` zero-drift verification).
+  * **Batch Jobs Tab**: Trigger **End-of-Day (EOD)** settlement, daily interest accruals, and **End-of-Month (EOM)** interest posting.
+* **`/admin/audit`**: Real-time forensic audit log viewer with expandable JSON metadata and IP context.
+
+---
+
+## 🛠️ Tech Stack & Architecture
+
+* **Framework**: Next.js 16 (App Router)
+* **UI & Styling**: React 19, Tailwind CSS v4, Lucide React icons
+* **HTTP Client**: Axios with automatic JWT injection and Bearer token handling
+* **Idempotency**: Client-side UUID generation (`Idempotency-Key` header) to guarantee zero duplicate charges on retries
+* **Next.js Proxy Convention**: `proxy.ts` (Next.js 16 convention replacing legacy middleware)
+
+---
+
+## ⚙️ Environment Variables
+
+Create a `.env.local` file in the `client/` root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `NEXT_PUBLIC_API_URL` | Base URL of the ByteVault Bun/Express backend | `http://localhost:4000` |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 💻 Development & Build Scripts
 
-## Learn More
+```bash
+# Install dependencies
+npm install # or bun install
 
-To learn more about Next.js, take a look at the following resources:
+# Start development server on http://localhost:3000
+npm run dev # or bun run dev
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Compile production build
+npm run build # or bun run build
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Start production server
+npm start # or bun run start
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Run ESLint validation
+npm run lint
+```

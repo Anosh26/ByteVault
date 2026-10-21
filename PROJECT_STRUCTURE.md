@@ -53,15 +53,18 @@ backend/
 │   │   ├── AccountService.ts# Helper to securely resolve account numbers to database UUIDs.
 │   │   └── AuditService.ts  # Handles logging every action to the immutable audit_logs table.
 │   └── routes/              # The actual API endpoints (Controllers)
-│       ├── auth.ts          # /api/auth/* (Login)
-│       ├── users.ts         # /api/users/* (Registration)
-│       ├── accounts.ts      # /api/accounts/* (Fetching balances)
+│       ├── auth.ts          # /api/auth/* (Employee Login & Profile)
+│       ├── users.ts         # /api/users/* (Customer Registration & KYC Verification)
+│       ├── customer.ts      # /api/customer/* (Customer Login, Dashboard, Transfers & Pipeline)
+│       ├── accounts.ts      # /api/accounts/* (Fetching balances & drift sync)
 │       ├── transfers.ts     # /api/transfers/* (Maker-Checker requests, approvals, rejections)
 │       ├── ledger.ts        # /api/ledger/* (Journal entries and Fraud Reversals)
 │       ├── holds.ts         # /api/holds/* (Locking funds temporarily)
+│       ├── audit.ts         # /api/audit/* (Immutable audit logs & metadata query)
 │       └── jobs.ts          # /api/admin/jobs/* (Triggers for EOD/EOM Batch Processing)
 └── scripts/
     ├── onboard.ts           # CLI script to create the first Admin user.
+    ├── deposit.ts           # CLI script to deposit funds into accounts.
     └── seed_demo.ts         # CLI script to populate dummy data for presentations.
 ```
 
@@ -69,26 +72,33 @@ backend/
 
 ## 4. Frontend Client (`/client`)
 
-The frontend is built with **Next.js (App Router)** and **Tailwind CSS**. It contains two completely separate visual experiences.
+The frontend is built with **Next.js 16 (App Router)**, **React 19**, and **Tailwind CSS**. It contains two completely separate visual experiences.
 
 ```text
 client/
 ├── app/
 │   ├── admin/               # The Admin Terminal
-│   │   ├── page.tsx         # Dashboard for managing Users, Reversing Journal Entries, and running Batch Jobs.
-│   │   ├── audit/           # View the immutable audit trail.
-│   │   └── transfers/       # The Checker interface to Approve/Reject pending transfers.
+│   │   ├── page.tsx         # Dashboard for managing Users (KYC), Reversing Journal Entries, Recon, and running Batch Jobs.
+│   │   └── audit/           # View the immutable audit trail with JSON metadata.
+│   ├── dashboard/           # The Employee Terminal
+│   │   └── page.tsx         # Maker request initiation & Checker transfer approval/rejection queue.
 │   ├── portal/              # The Customer Portal
 │   │   ├── login/           # Secure login for customers.
-│   │   ├── dashboard/       # Where customers see their balance and recent transactions.
+│   │   ├── dashboard/       # Customer overview, balance cards, and recent transactions.
+│   │   ├── transfer/        # Direct customer transfer initiation interface.
+│   │   ├── history/         # Full customer transaction history.
 │   │   └── layout.tsx       # Contains the PortalContext and the persistent Sidebar with the "Pending Transfer Pipeline".
-│   ├── login/               # Employee login portal.
-│   ├── globals.css          # Global Tailwind styles and custom CSS animations (like the transaction pipeline progress bar).
+│   ├── login/               # Employee staff login portal.
+│   ├── globals.css          # Global Tailwind styles and glassmorphism styling.
 │   └── layout.tsx           # The root HTML structure.
+├── components/              # Modular UI components
+│   ├── dashboard/           # AccountsTable, TransferWorkflow (Maker-Checker actions)
+│   └── ui/                  # BalanceCard, Navbar
 ├── lib/
 │   ├── axios.ts             # API client configured to automatically attach the JWT token to every request.
 │   ├── format.ts            # Helpers to format currency (₹) and dates.
-│   └── idempotency.ts       # Generates unique UUIDs on the client to prevent double-submissions.
+│   ├── idempotency.ts       # Generates unique UUIDs on the client to prevent double-submissions.
+│   └── types.ts             # Shared TypeScript types and interfaces.
 └── .env.local               # Contains NEXT_PUBLIC_API_URL pointing to the backend.
 ```
 

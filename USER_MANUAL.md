@@ -75,11 +75,13 @@ ByteVault strictly enforces Know Your Customer (KYC) regulations and allows admi
 ### The KYC Gateway
 When a customer is first onboarded, their `kyc_status` defaults to `PENDING`. 
 *   **The Restriction:** A customer with a `PENDING` or `REJECTED` status is blocked at the gateway level. If they log into the Customer Portal (`/portal/login`), they will see a warning banner stating "Action Required: Complete KYC Verification". The "Send Money" functionality is completely hard-blocked both in the UI and via the backend API logic.
-*   **The Verification:** A bank employee (Maker/Admin) must physically verify the user's documents and update the database to set `kyc_status = 'VERIFIED'`. Once verified, the gateway opens, and the user can initiate transfer requests.
-*(Currently, verification is done directly in the database. In the future, a "Verify KYC" button will be added to the Admin UI).*
-```sql
-UPDATE users SET kyc_status = 'VERIFIED' WHERE email = 'customer@example.com';
-```
+*   **The Verification:** A bank employee (Maker/Admin) verifies the user's documents. In ByteVault, this can be done in two ways:
+    1. **Via the Admin Dashboard (Recommended):** Navigate to the **Customers** tab at `/admin`, locate the customer row, and click the green **"Verify"** button (or red **"Reject"** button).
+    2. **Via the API:** Send an authenticated `POST /api/users/:id/kyc` with payload `{"status": "VERIFIED"}`.
+    3. **Direct SQL (Fallback):**
+    ```sql
+    UPDATE users SET kyc_status = 'VERIFIED' WHERE email = 'customer@example.com';
+    ```
 
 ### Account States: Flagging, Blocking, and Unblocking
 Bank accounts have a `status` field that controls what actions can be performed. The states are:
