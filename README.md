@@ -7,6 +7,12 @@ Banking management app foundation:
 - **Backend**: Bun + Express (`backend/`)
 - **Frontend**: Next.js (`client/`)
 
+## 📚 Project Documentation & Interview Guides
+- **[🎯 Comprehensive Interview Cheat Sheet & Technical Defense Guide](INTERVIEW_CHEATSHEET.md)** *(Start here for interview prep!)*
+- **[📁 Project Architecture & File Structure](PROJECT_STRUCTURE.md)**
+- **[🎬 Demo Script](DEMO_SCRIPT.md)**
+- **[📖 User Manual](USER_MANUAL.md)**
+
 ## Prereqs
 
 - Docker Desktop (Linux engine running)
