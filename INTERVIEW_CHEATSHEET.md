@@ -16,6 +16,10 @@
 5. [Top 5 Tricky / Deep Questions & Answers](#5-top-5-tricky--deep-questions--answers)
 6. [Honest Limitations & What You Would Improve](#6-honest-limitations--what-you-would-improve)
 7. [Quick Memory Table (Flashcards)](#7-quick-memory-table)
+8. [Database Deep-Dive & SQL Refresher (DDL, DML, DCL, TCL)](#8-database-deep-dive--sql-refresher-ddl-dml-dcl-tcl)
+9. [Database Setup, Stored Procedures & Triggers](#9-database-setup-stored-procedures--triggers)
+10. [Entity Relationship Diagram (ERD) & Schema Architecture](#10-entity-relationship-diagram-erd--schema-architecture)
+11. [Codebase Architecture & File Structure](#11-codebase-architecture--file-structure)
 
 ---
 
@@ -293,3 +297,384 @@ If an interviewer asks: *"Walk me through what happens under the hood when a cus
 | **Clearing Account** | A temporary middleman bucket between branches. | Keeps the accounting books balanced on both branches during a transfer. |
 | **Reversal** | Adding an opposite transaction to cancel a mistake. | Fixes mistakes without ever deleting or changing old records. |
 | **Lock Timeout** | Giving up after 3 seconds if a table row is busy. | Stops two transfers from getting stuck waiting for each other forever. |
+
+---
+
+## 8. Database Deep-Dive & SQL Refresher (DDL, DML, DCL, TCL)
+
+### SQL Commands Overview Table
+
+| Command Type | Full Name | Plain English Meaning | SQL Verbs | ByteVault Example |
+| :--- | :--- | :--- | :--- | :--- |
+| **DDL** | Data Definition Language | Creates or modifies database skeleton & rules | `CREATE`, `ALTER`, `DROP`, `TRUNCATE` | `CREATE TABLE accounts (...)`, `CREATE INDEX ...` |
+| **DML** | Data Manipulation Language | Reads, inserts, edits, or deletes row data | `SELECT`, `INSERT`, `UPDATE`, `DELETE` | `UPDATE accounts SET balance = balance - 100` |
+| **DCL** | Data Control Language | Manages user access, permissions, and security | `GRANT`, `REVOKE`, `CREATE USER MAPPING` | `CREATE USER MAPPING FOR CURRENT_USER SERVER sub_branch` |
+| **TCL** | Transaction Control Language | Manages atomic operations & commits/rollbacks | `BEGIN`, `COMMIT`, `ROLLBACK`, `PREPARE` | `PREPARE TRANSACTION 'tx_01a'`, `COMMIT PREPARED` |
+
+---
+
+### Core DDL Queries in ByteVault
+
+```sql
+-- 1. Accounts Table (Checking positive balances)
+CREATE TABLE accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE RESTRICT,
+    branch_id UUID REFERENCES branches(id) ON DELETE RESTRICT,
+    account_number VARCHAR(20) UNIQUE NOT NULL,
+    balance DECIMAL(15, 2) NOT NULL DEFAULT 0.00 CHECK (balance >= 0),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'FROZEN', 'CLOSED')),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Account Holds (Funds frozen during Maker-Checker approval)
+CREATE TABLE account_holds (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    amount_cents BIGINT NOT NULL CHECK (amount_cents > 0),
+    reason VARCHAR(200),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'RELEASED', 'CAPTURED', 'EXPIRED')),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    released_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 3. Double-Entry Journal Lines (Signed cents; total across entry sums to 0)
+CREATE TABLE journal_lines (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entry_id UUID NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+    ledger_account_id UUID NOT NULL REFERENCES ledger_accounts(id) ON DELETE RESTRICT,
+    amount_cents BIGINT NOT NULL CHECK (amount_cents <> 0),
+    memo TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Materialized View for instant daily balance rollups
+CREATE MATERIALIZED VIEW IF NOT EXISTS ledger_daily_balances AS
+SELECT 
+    ledger_account_id,
+    DATE(created_at) AS balance_date,
+    SUM(amount_cents) AS daily_net_cents
+FROM journal_lines
+GROUP BY ledger_account_id, DATE(created_at);
+```
+
+---
+
+### Core DML Queries in ByteVault
+
+```sql
+-- Row-level locking to prevent race conditions (Double-spending)
+SELECT id FROM accounts WHERE id = $1 FOR UPDATE;
+
+-- Placing an active hold on funds when Maker submits transfer
+INSERT INTO account_holds (account_id, amount_cents, reason, status)
+VALUES ($1, $2, 'Transfer Request', 'ACTIVE') RETURNING id;
+
+-- Capturing hold upon manager approval
+UPDATE account_holds 
+SET status = 'CAPTURED', released_at = CURRENT_TIMESTAMP 
+WHERE id = $1 AND status = 'ACTIVE';
+
+-- Writing balanced journal lines
+INSERT INTO journal_lines (entry_id, ledger_account_id, amount_cents, memo)
+VALUES 
+    ($entry_id, $from_ledger_account_id, -10000, 'Interbranch debit'),
+    ($entry_id, $clearing_ledger_account_id, +10000, 'Interbranch clearing credit');
+```
+
+---
+
+### Core DCL Queries (Postgres FDW)
+
+```sql
+-- Link Branch A (Main) to Branch B (Sub) over Docker network
+CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+
+CREATE SERVER IF NOT EXISTS sub_branch
+    FOREIGN DATA WRAPPER postgres_fdw
+    OPTIONS (host 'branch_b_db', port '5432', dbname 'branch_b_db');
+
+CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER 
+    SERVER sub_branch
+    OPTIONS (user 'admin_b', password 'secure_password_b');
+
+IMPORT FOREIGN SCHEMA public
+    LIMIT TO (branches, users, employees, accounts, transactions, ledger_accounts, journal_lines)
+    FROM SERVER sub_branch
+    INTO fdw_sub;
+```
+
+---
+
+### Core TCL Queries (Distributed Two-Phase Commit - 2PC)
+
+```sql
+-- Phase 1: Begin & Prepare
+-- (Executed on both Branch A and Branch B connections concurrently)
+BEGIN;
+SET statement_timeout = 5000;
+SET lock_timeout = 3000;
+-- ... [execute balance deductions, ledger entries, row locks] ...
+PREPARE TRANSACTION 'tx_987654_A'; -- Branch A
+PREPARE TRANSACTION 'tx_987654_B'; -- Branch B
+
+-- Phase 2: Commit (only if BOTH databases succeeded in Phase 1)
+COMMIT PREPARED 'tx_987654_A';
+COMMIT PREPARED 'tx_987654_B';
+
+-- If either database failed Phase 1:
+ROLLBACK PREPARED 'tx_987654_A';
+ROLLBACK PREPARED 'tx_987654_B';
+```
+
+---
+
+## 9. Database Setup, Stored Procedures & Triggers
+
+### How to Create & Spin Up the ByteVault Database
+
+1. **Automated Docker Initialization:**
+   - Command: `docker compose up -d branch_b_db branch_a_db`
+   - How it works: Both Postgres containers run image `postgres:16-alpine`.
+   - On boot, `/docker-entrypoint-initdb.d/01_init.sql` automatically mounts `docker/init.sql` and `docker/custom.conf` (enabling `max_prepared_transactions = 100` for 2PC).
+   - Port mapping: Branch A is accessible on `localhost:55432`, Branch B on `localhost:55433`.
+
+2. **Manual `psql` Execution:**
+   ```bash
+   psql -U admin_b -d branch_b_db -p 55433 -f docker/init.sql
+   psql -U admin_a -d branch_a_db -p 55432 -f docker/init.sql
+   ```
+
+---
+
+### Stored Procedures & Triggers
+
+#### 1. High-Value Transaction Guard Trigger (`trg_large_transaction_guard`)
+* **Purpose:** Enforces compliance at the database level. If any transaction ₹5,00,000 (5 Lakhs) or higher is attempted without Maker-Checker approval, it triggers an audit alert and halts the query.
+
+```sql
+CREATE OR REPLACE FUNCTION fn_flag_large_transactions()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.amount >= 500000 THEN
+        -- 1. Insert alert directly into immutable audit trail
+        INSERT INTO audit_logs (actor_type, actor_id, action, entity_type, entity_id, meta)
+        VALUES (
+            'EMPLOYEE', 
+            '00000000-0000-0000-0000-000000000000'::UUID,
+            'HIGH_VALUE_ALERT', 
+            'TRANSACTION', 
+            NULL, 
+            jsonb_build_object('amount', NEW.amount, 'account_id', NEW.account_id, 'alert', 'Large transaction detected (5L+)')
+        );
+
+        -- 2. Reject direct status bypass to COMPLETED
+        IF NEW.status = 'COMPLETED' THEN
+            RAISE EXCEPTION 'Transaction amount % exceeds threshold (500,000). High-value transactions must be processed via Maker-Checker workflow.', NEW.amount;
+        END IF;
+
+        -- 3. Automatically flag pending entries
+        IF NEW.status = 'PENDING' THEN
+            NEW.status := 'FLAGGED';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_large_transaction_guard
+BEFORE INSERT OR UPDATE ON transactions
+FOR EACH ROW EXECUTE FUNCTION fn_flag_large_transactions();
+```
+
+#### 2. Stored Function: `check_balance(acc_id UUID)`
+```sql
+CREATE OR REPLACE FUNCTION check_balance(acc_id UUID)
+RETURNS TABLE (balance DECIMAL(15, 2)) AS $$
+BEGIN
+    RETURN QUERY SELECT a.balance FROM accounts a WHERE a.id = acc_id;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+---
+
+## 10. Entity Relationship Diagram (ERD) & Schema Architecture
+
+```mermaid
+erDiagram
+    BRANCHES ||--o{ EMPLOYEES : employs
+    BRANCHES ||--o{ ACCOUNTS : hosts
+    USERS ||--o{ ACCOUNTS : owns
+    EMPLOYEES ||--o| EMPLOYEE_CREDENTIALS : has
+    
+    ACCOUNTS ||--o{ TRANSACTIONS : logs
+    ACCOUNTS ||--o{ ACCOUNT_HOLDS : locks_funds
+    ACCOUNTS ||--o| LEDGER_ACCOUNTS : maps_to
+    
+    ACCOUNT_HOLDS ||--o| TRANSFER_REQUESTS : holds_funds_for
+    EMPLOYEES ||--o{ TRANSFER_REQUESTS : created_by_maker
+    EMPLOYEES ||--o{ TRANSFER_REQUESTS : approved_by_checker
+    ACCOUNTS ||--o{ TRANSFER_REQUESTS : source_account
+    
+    LEDGER_ACCOUNTS ||--o{ JOURNAL_LINES : debited_or_credited
+    JOURNAL_ENTRIES ||--|{ JOURNAL_LINES : contains
+    JOURNAL_ENTRIES ||--o| JOURNAL_ENTRIES : reverses
+    EMPLOYEES ||--o{ JOURNAL_ENTRIES : created_by
+    
+    BRANCHES {
+        UUID id PK
+        VARCHAR branch_code UK
+        VARCHAR ifsc_code UK
+        VARCHAR name
+        TEXT location
+    }
+
+    USERS {
+        UUID id PK
+        VARCHAR email UK
+        VARCHAR phone UK
+        VARCHAR pan_card UK
+        VARCHAR password_hash
+        VARCHAR full_name
+        VARCHAR kyc_status
+    }
+
+    EMPLOYEES {
+        UUID id PK
+        UUID branch_id FK
+        VARCHAR email UK
+        VARCHAR full_name
+        VARCHAR role
+    }
+
+    ACCOUNTS {
+        UUID id PK
+        UUID user_id FK
+        UUID branch_id FK
+        VARCHAR account_number UK
+        DECIMAL balance
+        VARCHAR status
+    }
+
+    ACCOUNT_HOLDS {
+        UUID id PK
+        UUID account_id FK
+        BIGINT amount_cents
+        VARCHAR status
+        TIMESTAMP expires_at
+    }
+
+    TRANSFER_REQUESTS {
+        UUID id PK
+        UUID created_by_employee_id FK
+        UUID approved_by_employee_id FK
+        UUID from_account_id FK
+        VARCHAR to_account_number
+        UUID to_account_id
+        UUID hold_id FK
+        DECIMAL amount
+        VARCHAR status
+        VARCHAR execution_tx_id
+    }
+
+    LEDGER_ACCOUNTS {
+        UUID id PK
+        VARCHAR code UK
+        VARCHAR name
+        VARCHAR type
+        UUID ref_account_id FK
+    }
+
+    JOURNAL_ENTRIES {
+        UUID id PK
+        VARCHAR kind
+        TEXT description
+        VARCHAR external_ref
+        UUID reversal_of_entry_id FK
+        UUID created_by_employee_id FK
+    }
+
+    JOURNAL_LINES {
+        UUID id PK
+        UUID entry_id FK
+        UUID ledger_account_id FK
+        BIGINT amount_cents
+        TEXT memo
+    }
+
+    AUDIT_LOGS {
+        UUID id PK
+        VARCHAR actor_type
+        UUID actor_id
+        VARCHAR action
+        VARCHAR entity_type
+        UUID entity_id
+        JSONB meta
+    }
+```
+
+---
+
+## 11. Codebase Architecture & File Structure
+
+```text
+ByteVault/
+├── backend/                  # Bun + Express API Server (Core Business Logic)
+│   ├── index.ts              # Express initialization, CORS, global error handling
+│   ├── src/
+│   │   ├── db.ts             # Connection pools (poolA for Main, poolB for Sub)
+│   │   ├── auth/jwt.ts       # Signs and verifies JWTs with RBAC claims
+│   │   ├── middleware/
+│   │   │   ├── auth.ts       # Enforces RBAC ('MAKER', 'CHECKER', 'MANAGER', 'ADMIN')
+│   │   │   └── idempotency.ts# Detects duplicate requests using idempotency_keys table
+│   │   ├── controllers/
+│   │   │   └── transaction.controller.ts # Coordinates 2PC (PREPARE & COMMIT PREPARED)
+│   │   ├── ledger/
+│   │   │   ├── ledger.ts     # Double-entry ledger engine & balance calculations
+│   │   │   └── templates.ts  # Predefined balanced journal entry templates
+│   │   ├── services/
+│   │   │   ├── AccountService.ts # Account resolution across branches via FDW
+│   │   │   └── AuditService.ts   # Writes immutable logs to audit_logs
+│   │   └── routes/
+│   │       ├── auth.ts       # Staff login & session
+│   │       ├── customer.ts   # Customer dashboard, accounts, and history
+│   │       ├── transfers.ts  # Maker-Checker transfer request pipeline & approval
+│   │       ├── ledger.ts     # Journal inquiry & fraud reversals
+│   │       ├── holds.ts      # Active fund holds inspection
+│   │       ├── audit.ts      # Audit log explorer endpoint
+│   │       └── jobs.ts       # EOD/EOM automated batch triggers
+│   └── scripts/              # CLI helpers (onboard.ts, deposit.ts, seed_demo.ts)
+│
+├── client/                   # Next.js 16 (App Router), React 19, TailwindCSS Frontend
+│   ├── app/
+│   │   ├── admin/            # Admin Terminal (KYC, Fraud Reversal, EOD batch runner)
+│   │   ├── dashboard/        # Employee Terminal (Maker entry, Checker approval queue)
+│   │   ├── portal/           # Customer Portal (Accounts overview, live pipeline sidebar)
+│   │   └── login/            # Staff authentication portal
+│   └── lib/
+│       ├── axios.ts          # Axios client injecting Bearer JWT headers
+│       └── idempotency.ts    # Generates client UUIDs for payment idempotency
+│
+├── docker/                   # Database Infrastructure
+│   ├── init.sql              # Master DDL, DCL, FDW setup, and trigger definitions
+│   ├── custom.conf           # Sets max_prepared_transactions = 100 for 2PC
+│   └── trigger_large_tx.sql  # High-value Maker-Checker trigger definition
+│
+├── docker-compose.yml        # Orchestrates branch_a_db (55432) & branch_b_db (55433)
+└── scripts/dev.ps1           # One-click dev launcher using concurrently
+```
+
+### End-to-End Transfer Request Lifecycle
+1. **Maker Request:** Staff submits transfer on `/dashboard` $\rightarrow$ `POST /api/transfers/requests`.
+2. **Hold Placed:** Backend locks row (`FOR UPDATE`), checks available balance, creates `account_holds` row (status `ACTIVE`), and creates `transfer_requests` row (status `PENDING`).
+3. **Checker Approval:** Manager reviews on `/dashboard` $\rightarrow$ `POST /api/transfers/requests/:id/approve`.
+4. **2PC Execution:** Backend calls [`execute2pcTransfer()`](file:///c:/Users/Anosh/Documents/Notes/Projects/ByteVault/backend/src/controllers/transaction.controller.ts#L13):
+   - Captures the hold (`CAPTURED`).
+   - Updates account balances.
+   - Writes balanced `journal_lines` on both DBs.
+   - Executes `PREPARE TRANSACTION` on both DBs.
+   - Executes `COMMIT PREPARED` on both DBs.
+5. **Audit Trail:** [`AuditService.log()`](file:///c:/Users/Anosh/Documents/Notes/Projects/ByteVault/backend/src/services/AuditService.ts) writes an immutable record with JSON metadata.
