@@ -503,6 +503,119 @@ $$ LANGUAGE plpgsql;
 
 ## 10. Entity Relationship Diagram (ERD) & Schema Architecture
 
+### A. Academic Chen's / EER Diagram (Rectangles, Diamonds & ISA Triangles)
+
+> **Chen / EER Notation Quick Guide (For Interviews & Vivas):**
+> * **Square / Rectangle `[ ]`:** Entity Set (e.g., `BRANCHES`, `USERS`, `EMPLOYEES`, `ACCOUNTS`)
+> * **Diamond `{ }`:** Relationship Set (e.g., `employs`, `owns`, `initiates`, `approves`)
+> * **Triangle `▲ ISA`:** Generalization / Specialization (*"Is-A"* inheritance hierarchy)
+> * **Double Rectangle `[[ ]]` / Dashed:** Subclass / Weak Entity
+
+```mermaid
+flowchart TD
+    %% Styling Classes
+    classDef entity fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef subentity fill:#0f172a,stroke:#818cf8,stroke-width:2px,color:#e2e8f0;
+    classDef relation fill:#312e81,stroke:#c7d2fe,stroke-width:2px,color:#ffffff;
+    classDef isa fill:#854d0e,stroke:#facc15,stroke-width:2px,color:#fef08a;
+
+    %% 1. Core Entities (Square / Rectangle Boxes)
+    BRANCHES["BRANCHES"]:::entity
+    USERS["USERS"]:::entity
+    EMPLOYEES["EMPLOYEES"]:::entity
+    ACCOUNTS["ACCOUNTS"]:::entity
+    HOLDS["ACCOUNT_HOLDS"]:::entity
+    REQUESTS["TRANSFER_REQUESTS"]:::entity
+    TRANSACTIONS["TRANSACTIONS"]:::entity
+    LEDGER_ACC["LEDGER_ACCOUNTS"]:::entity
+    JOURNAL_ENT["JOURNAL_ENTRIES"]:::entity
+    JOURNAL_LIN["JOURNAL_LINES"]:::entity
+    CREDENTIALS["EMPLOYEE_CREDENTIALS"]:::entity
+
+    %% 2. ISA Triangles (Specialization / Generalization Hierarchies)
+    ISA_EMP[\"▲ ISA (Role)"/]:::isa
+    ISA_LEDGER[\"▲ ISA (Type)"/]:::isa
+    ISA_TX[\"▲ ISA (Direction)"/]:::isa
+
+    %% 3. Subclasses (Derived Specialized Entities)
+    MAKER["MAKER<br/>(Initiates Transfers)"]:::subentity
+    CHECKER["CHECKER<br/>(Approves Transfers)"]:::subentity
+    MANAGER["MANAGER<br/>(Branch Oversight)"]:::subentity
+    ADMIN["ADMIN<br/>(EOD & Recon)"]:::subentity
+
+    CUST_LEDGER["CUSTOMER_LEDGER<br/>(ref_account_id)"]:::subentity
+    INT_LEDGER["INTERNAL_LEDGER<br/>(CLEARING / FEES)"]:::subentity
+
+    DEBIT_TX["DEBIT_TX<br/>(- funds)"]:::subentity
+    CREDIT_TX["CREDIT_TX<br/>(+ funds)"]:::subentity
+
+    %% 4. Relationships (Diamonds)
+    REL_EMPLOYS{"employs"}:::relation
+    REL_HOUSES{"houses"}:::relation
+    REL_OWNS{"owns"}:::relation
+    REL_CREDS{"has_secret"}:::relation
+    REL_MAPS{"maps_to"}:::relation
+    REL_LOCKS{"locks"}:::relation
+    REL_INITIATES{"initiates"}:::relation
+    REL_APPROVES{"approves"}:::relation
+    REL_GUARANTEES{"guarantees"}:::relation
+    REL_LOGS{"logs"}:::relation
+    REL_IMPACTS{"impacts"}:::relation
+    REL_CONTAINS{"contains"}:::relation
+    REL_REVERSES{"reverses"}:::relation
+
+    %% Topology & Connections
+    BRANCHES --- REL_EMPLOYS --- EMPLOYEES
+    BRANCHES --- REL_HOUSES --- ACCOUNTS
+    USERS --- REL_OWNS --- ACCOUNTS
+    EMPLOYEES --- REL_CREDS --- CREDENTIALS
+
+    %% EMPLOYEES ISA Hierarchy
+    EMPLOYEES --- ISA_EMP
+    ISA_EMP --- MAKER
+    ISA_EMP --- CHECKER
+    ISA_EMP --- MANAGER
+    ISA_EMP --- ADMIN
+
+    %% Maker-Checker Flow with Account Holds
+    MAKER --- REL_INITIATES --- REQUESTS
+    CHECKER --- REL_APPROVES --- REQUESTS
+    ACCOUNTS --- REL_LOCKS --- HOLDS
+    HOLDS --- REL_GUARANTEES --- REQUESTS
+
+    %% Accounts to Transactions & ISA
+    ACCOUNTS --- REL_LOGS --- TRANSACTIONS
+    TRANSACTIONS --- ISA_TX
+    ISA_TX --- DEBIT_TX
+    ISA_TX --- CREDIT_TX
+
+    %% Accounts to Double-Entry Ledger & ISA
+    ACCOUNTS --- REL_MAPS --- LEDGER_ACC
+    LEDGER_ACC --- ISA_LEDGER
+    ISA_LEDGER --- CUST_LEDGER
+    ISA_LEDGER --- INT_LEDGER
+
+    %% Journal Entries and Lines
+    JOURNAL_ENT --- REL_CONTAINS --- JOURNAL_LIN
+    LEDGER_ACC --- REL_IMPACTS --- JOURNAL_LIN
+    JOURNAL_ENT --- REL_REVERSES --- JOURNAL_ENT
+```
+
+---
+
+### B. The 3 Crucial `ISA` (Generalization / Specialization) Hierarchies in ByteVault
+
+1. **`EMPLOYEES` $\xrightarrow{\text{ISA}}$ `MAKER` | `CHECKER` | `MANAGER` | `ADMIN`**
+   - **Why this exists:** Banking compliance dictates the strict **Two-Person Rule (Maker-Checker)**. A `MAKER` entity can only insert `PENDING` transfer requests. Only a `CHECKER` or `MANAGER` entity can approve them. A maker cannot approve their own transfer.
+2. **`LEDGER_ACCOUNTS` $\xrightarrow{\text{ISA}}$ `CUSTOMER_LEDGER` | `INTERNAL_LEDGER`**
+   - **Why this exists:** The double-entry accounting engine segregates individual bank customer accounts (`ref_account_id`) from system internal buckets (like `CLEARING_INTERBRANCH`, `FEE_INCOME`, and `SUSPENSE`).
+3. **`TRANSACTIONS` $\xrightarrow{\text{ISA}}$ `DEBIT_TX` | `CREDIT_TX`**
+   - **Why this exists:** Every movement manifests as either an outgoing debit (`-`) or incoming credit (`+`), ensuring that total system money balances to exactly zero.
+
+---
+
+### C. Physical Relational Schema Diagram (Crow's Foot Notation)
+
 ```mermaid
 erDiagram
     BRANCHES ||--o{ EMPLOYEES : employs
